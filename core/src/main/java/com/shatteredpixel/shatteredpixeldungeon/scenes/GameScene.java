@@ -116,8 +116,10 @@ import com.watabou.noosa.Visual;
 import com.watabou.noosa.audio.Music;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.particles.Emitter;
+import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.GameMath;
 import com.watabou.utils.Random;
+import com.zrp200.scrollofdebug.ScrollOfDebug;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -184,7 +186,23 @@ public class GameScene extends PixelScene {
 			ShatteredPixelDungeon.switchNoFade(TitleScene.class);
 			return;
 		}
-		
+
+		// debug logic
+		ScrollOfDebug debug = Dungeon.hero.belongings.getItem(ScrollOfDebug.class);
+		// by default only added in "indev" builds.
+		boolean supported = DeviceCompat.isDebug();
+		if(supported) {
+			if(debug == null) {
+				debug = new ScrollOfDebug();
+				if(!debug.collect()) Dungeon.hero.belongings.backpack.items.add(debug);
+			}
+			Dungeon.quickslot.setSlot(3, debug);
+		} else if(debug != null) {
+			// attempt to remove scroll of debug automatically.
+			debug.detachAll(Dungeon.hero.belongings.backpack);
+			Dungeon.quickslot.clearItem(debug);
+		}
+
 		Music.INSTANCE.playTracks(
 				new String[]{Assets.Music.SEWERS_1, Assets.Music.SEWERS_2, Assets.Music.SEWERS_2},
 				new float[]{1, 1, 0.5f},
@@ -941,7 +959,7 @@ public class GameScene extends PixelScene {
 	public static void flashForDocument( String page ){
 		if (scene != null) scene.pane.flashForPage( page );
 	}
-	
+
 	public static void updateKeyDisplay(){
 		if (scene != null) scene.pane.updateKeys();
 	}
