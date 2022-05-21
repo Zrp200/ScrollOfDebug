@@ -196,7 +196,13 @@ public class GameScene extends PixelScene {
 				debug = new ScrollOfDebug();
 				if(!debug.collect()) Dungeon.hero.belongings.backpack.items.add(debug);
 			}
-			Dungeon.quickslot.setSlot(3, debug);
+			if(!Dungeon.quickslot.contains(debug)) {
+				int slot = 0;
+				// it'll overwrite the last slot if they are all full.
+				// Perhaps a bit pushy, but the whole point is for it to be available, after all.
+				while(slot < Dungeon.quickslot.SIZE - 1 && Dungeon.quickslot.getItem(slot) != null) slot++;
+				Dungeon.quickslot.setSlot(slot,debug);
+			}
 		} else if(debug != null) {
 			// attempt to remove scroll of debug automatically.
 			debug.detachAll(Dungeon.hero.belongings.backpack);
