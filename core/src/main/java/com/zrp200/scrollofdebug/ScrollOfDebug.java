@@ -1,5 +1,6 @@
 package com.zrp200.scrollofdebug;
 
+import static com.shatteredpixel.shatteredpixeldungeon.Dungeon.*;
 import static java.util.Arrays.copyOfRange;
 
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
@@ -42,24 +43,27 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.watabou.noosa.ui.Component;
 import com.watabou.utils.Callback;
 import com.watabou.utils.Reflection;
-import com.zrp200.scrollofdebug.PackageTrie;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Scroll of Debug uses ClassLoader to get every class that can be directly created and provides a command interface with which to interact with them.
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v0.3.0
+ * @version v0.4.0
  * **/
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ScrollOfDebug extends Scroll {
     {
         image = ItemSpriteSheet.SCROLL_HOLDER;
     }
+
+    static String lastCommand = ""; // used with '!!'
 
     /** this is where all the game files are supposed to be located. **/
     private static final String ROOT = "com.shatteredpixel.shatteredpixeldungeon";
@@ -69,34 +73,37 @@ public class ScrollOfDebug extends Scroll {
                 "[COMMAND | all]",
                 "Gives more information on commands, or in the case of 'all', all of them."),
         // todo add more debug-oriented commands
+        CHANGES(null, "", "Gives a history of changes to Scroll of Debug."),
         // generation commands.
         GIVE(Item.class,
                 "ITEM [_+_LEVEL] [_x_QUANTITY] [-f | --force] [ METHOD [args] ]",
                 "Creates and puts into your inventory the generated item."),
         SPAWN(Mob.class,
-                "MOB",
-                "Summons the indicated mob and randomly places them on the depth."),
+                "MOB [_x_QUANTITY | -p | --place]",
+                "Summons the indicated mob and randomly places them on the depth. -p allows manual placement, though cannot be combined with a quantity argument."),
         SET(Trap.class,
                 "TRAP",
                 "Sets a trap at an indicated position"),
         AFFECT(Buff.class,
                 "BUFF [duration] [METHOD [args]]",
-                "Allows you to attach a buff to a character in sight. This can be extremely dangerous, or it could do literally nothing."),
+                "Allows you to attach a buff to a character in sight."),
         SEED(Blob.class,
                 "BLOB [amount]",
                 "Seeds a blob of the specified amount to a targeted tile"),
-        INSPECT(Object.class, "CLASS", "Gives a list of supported methods for the indicated class.") {
-            @Override String fullDocumentation(PackageTrie trie) {
-                return documentation(); // absolutely not.
-            }
-        };
+        USE(Object.class, "CLASS method [args]", "Use a specified method from a desired class.", false),
+        INSPECT(Object.class, "CLASS", "Gives a list of supported methods for the indicated class.", false);
 
         final Class<?> paramClass;
         final String syntax, description;
-        Command(Class<?> paramClass, String syntax, String description) {
+        final boolean includeUses;
+        Command(Class<?> paramClass, String syntax, String description, boolean includeUses) {
             this.paramClass = paramClass;
             this.syntax = syntax;
             this.description = description;
+            this.includeUses = includeUses;
+        }
+        Command(Class<?> paramClass, String syntax, String description) {
+            this(paramClass,syntax,description,true);
         }
 
         @Override public String toString() { return name().toLowerCase(); }
@@ -109,7 +116,7 @@ public class ScrollOfDebug extends Scroll {
         // adds more information depending on what the paramClass actually is.
         String fullDocumentation(PackageTrie trie) {
             String documentation = documentation();
-            if(paramClass != null) {
+            if(paramClass != null && includeUses) {
                 documentation += "\n\n_Valid Classes_:" + listAllClasses(trie,paramClass);
             }
             return documentation;
@@ -129,6 +136,17 @@ public class ScrollOfDebug extends Scroll {
             @Override public void onSelect(boolean positive, String text) {
                 if(!positive) return;
 
+                // !! handling
+                {
+                    Matcher m = Pattern.compile("!!").matcher(text);
+                    if(m.find()) {
+                        GLog.newLine();
+                        GLog.i("> %s", text = m.replaceAll(lastCommand));
+                        GLog.newLine();
+                    }
+                }
+                lastCommand = text;
+
                 String[] input = text.split(" ");
                 Callback init = null;
 
@@ -138,7 +156,10 @@ public class ScrollOfDebug extends Scroll {
                     return;
                 }
 
-                if(command == Command.HELP) {
+                if(command == Command.CHANGES) {
+                    GameScene.show(new HelpWindow(CHANGELOG));
+                }
+                else if(command == Command.HELP) {
                     String output = null;
                     boolean all = false;
                     if (input.length > 1) {
@@ -198,16 +219,79 @@ public class ScrollOfDebug extends Scroll {
 
                     final Class cls = _cls;
 
+                    if(command == Command.USE) {
+                        // alias for inspect when not enough args.
+                        if(input.length == 2) onSelect(true, "inspect " + input[1]);
+                        else if(!executeMethod(
+                                cls == Hero.class ? Dungeon.hero
+                                        : cls != null && canInstantiate(cls) ? Reflection.newInstance(cls)
+                                        : null,
+                                cls, input, 2)) {
+                            GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
+                        }
+                        return;
+                    }
+
                     boolean valid = true;
                     Object o = null; try {
                         o = Reflection.newInstanceUnhandled(cls);
                     } catch (Exception e) { valid = false; }
                     if (valid) switch (command) {
                         case SPAWN: Mob mob = (Mob)o;
-                            mob.pos = Dungeon.level.randomRespawnCell(mob);
-                            if(mob.pos != 1) {
-                                GameScene.add(mob);
-                                GLog.w("Summoned " + mob.name());
+                            // process args
+                            int quantity = 1;
+                            boolean manualPlace = false;
+                            boolean qSpecified = false;
+                            if(input.length > 2) {
+                                String opt = input[2];
+                                // is this a forced use of regex?
+                                Matcher matcher = Pattern.compile("x(\\d+)").matcher(opt);
+                                if(matcher.find()) {
+                                    quantity = Integer.parseInt(matcher.group(1));
+                                    qSpecified = true;
+                                } else if(opt.matches("-p|--place")) {
+                                    manualPlace = true;
+                                }
+                            }
+                            if(manualPlace) {
+                                GameScene.selectCell(new CellSelector.Listener() {
+                                    @Override public String prompt() {
+                                        return "Select a tile to place " + mob.name();
+                                    }
+                                    @Override public void onSelect(Integer cell) {
+                                        if(cell == null) return;
+                                        // damn it evan for making me copy paste this
+                                        if(level.findMob(cell) != null
+                                                || !level.passable[cell]
+                                                || level.solid[cell]
+                                                || !level.openSpace[cell] && mob.properties().contains(Char.Property.LARGE)
+                                        ) {
+                                            GLog.w("You cannot place %s here.", mob.name());
+                                            return;
+                                        }
+                                        mob.pos = cell;
+                                        GameScene.add(mob);
+                                        // doing this means that I can't actually let you select cells for methods; it'll be immediately cancelled.
+                                        executeMethod(mob,input,3);
+                                        GLog.w("Summoned " + mob.name());
+                                    }
+                                });
+                            } else {
+                                int spawned = 0;
+                                boolean canExecute = true;
+                                // nonstandard for loop that generates mobs. first mob is the original one.
+                                for(Mob m = mob; m != null && spawned++ < quantity; m = (Mob)Reflection.newInstance(cls)) {
+                                    m.pos = level.randomRespawnCell(m);
+                                    if(m.pos == -1) break;
+                                    GameScene.add(m);
+                                    // if it fails we don't want to flood the screen with messages.
+                                    if(canExecute) canExecute = executeMethod(m, input, qSpecified?3:2);
+                                }
+                                spawned--;
+                                GLog.w("Summoned "
+                                        + mob.name()
+                                        + (spawned == 1 ? "" : " x" + spawned)
+                                );
                             }
                             break;
                         case SET:
@@ -250,8 +334,7 @@ public class ScrollOfDebug extends Scroll {
                                     }
                                 }
                             } catch (NumberFormatException e) {/* do nothing */}
-                            if(++last < input.length) executeMethod(input[last++],
-                                    item, copyOfRange(input, last, input.length));
+                            if(++last < input.length) executeMethod(item, input, last);
                             Item toPickUp = collect ? new Item() {
                                 // create wrapper item that simulates doPickUp while actually just calling collect.
                                 { image = item.image; }
@@ -266,8 +349,9 @@ public class ScrollOfDebug extends Scroll {
                                 if(important) GLog.p(pickupMessage); else GLog.i(pickupMessage);
                                 // attempt to nullify turn usage.
                                 curUser.spend(-curUser.cooldown());
+                            } else {
+                                GLog.n(Messages.get(curUser, "you_cant_have", item.name()));
                             }
-                            // worth a shot.
                             break;
                         case AFFECT:
                             Buff buff = (Buff)o;
@@ -302,14 +386,14 @@ public class ScrollOfDebug extends Scroll {
                                             // check some common methods for active buffs
                                             String[] methodNames = {"set", "reset", "prolong", "extend"};
                                             for(String methodName : methodNames) {
-                                                if(success = executeMethod(methodName,added, copyOfRange(input,index,input.length)))
+                                                if(success = executeMethod(added, methodName, copyOfRange(input,index,input.length)))
                                                     break;
                                             }
                                         }
                                         // attempt to call a specified method.
                                         if(!success &&
                                                 index < input.length
-                                                && !executeMethod(input[index], added, copyOfRange(input,index+1,input.length))
+                                                && !executeMethod(added, input, index)
                                         ) GLog.w("Warning: No supported method matching "+input[index]+" was found.");
                                     }
                                     if(added == null) {
@@ -369,21 +453,46 @@ public class ScrollOfDebug extends Scroll {
         return true;
     }
     @Override public boolean isKnown() { return true; }
+    {
+        unique = true;
+    }
 
+    // variant that derives class from the object given
+    <T> boolean executeMethod(T obj, String methodName, String... args) {
+        return executeMethod(obj, (Class<T>)obj.getClass(), methodName, args);
+    }
     // fixme there's no way to know how many arguments were actually used, which forces this to be the last command.
     /** dynamic method execution logic **/
-    boolean executeMethod(String methodName, Object obj, String... args) {
+    <T> boolean executeMethod(T obj, Class<? super T> cls, String methodName, String... args) {
         ArrayList<Method> methods = new ArrayList<>();
-        for(Method method : obj.getClass().getMethods()) {
+        for(Method method : cls.getMethods()) {
             if(method.getName().equalsIgnoreCase(methodName)) methods.add(method);
         }
         Collections.sort(methods, (m1, m2) -> m2.getParameterTypes().length - m1.getParameterTypes().length );
         for(Method method : methods) try {
-            method.invoke(obj, getArguments(method.getParameterTypes(), args));
+            Object[] arguments = getArguments(method.getParameterTypes(), args);
+            Object result = method.invoke(obj, arguments);
+            if(result != null) {
+                String argsAsString = Arrays.deepToString(arguments);
+                GLog.w("%s%s%s(%s): %s",
+                        cls.getSimpleName(),
+                        Modifier.isStatic(method.getModifiers()) ? '.' : '#',
+                        method.getName(),
+                        // snip first and last brace
+                        argsAsString.substring(1,argsAsString.length()-1), result);
+            }
             return true;
         } catch (Exception e) {/*do nothing */}
         return false;
     }
+    // shortcut methods that interpret input to get the arguments needed
+    <T> boolean executeMethod(T obj, Class<? super T> cls, String[] input, int startIndex) {
+        return startIndex < input.length && executeMethod(obj, cls, input[startIndex++], startIndex < input.length
+                ? copyOfRange(input, startIndex, input.length)
+                : new String[0]
+        );
+    }
+    <T> boolean executeMethod(T obj, String[] input, int startIndex) { return executeMethod(obj, (Class<T>)obj.getClass(), input, startIndex); }
 
     // throws an exception if it fails. This removes the need for me to handle errors at all.
     Object[] getArguments(Class[] params, String[] input) throws Exception {
@@ -416,12 +525,12 @@ public class ScrollOfDebug extends Scroll {
             }
             else if(Char.class.isAssignableFrom(type)) {
                 // two subclasses, which means two possible ways for this to go.
-                if(type.isAssignableFrom(Hero.class) && input[j].equalsIgnoreCase("hero")) {
+                if(j < input.length && type.isAssignableFrom(Hero.class) && input[j].equalsIgnoreCase("hero")) {
                     params[i] = Hero.class;
                     j++;
                 }
                 if(type == Hero.class) args[i] = curUser; // autofill
-                delayedChecks.put(i, type);
+                else delayedChecks.put(i, type);
             } else args[i] = Class.class.isAssignableFrom(type)
                     ? trie.findClass(input[j++], Object.class)
                     : Reflection.newInstanceUnhandled(trie.findClass(input[j++], type));
@@ -560,4 +669,22 @@ public class ScrollOfDebug extends Scroll {
         try { c.getConstructor(); } catch (NoSuchMethodException e) { return false; }
         return !( Modifier.isAbstract(c.getModifiers()) || Reflection.isMemberClass(c) && !Reflection.isStatic(c) );
     }
+
+    private static final String CHANGELOG
+        = "_0.4.0_:"
+            +"\n_-_ Added this command."
+            +"\n_-_ Added _use_ command, which can call a desired method on any game class that supports it (see _inspect_ for valid methods)."
+            +"\n_-_ Including _!!_ in a command will replace it with the previously written command."
+            +"\n_- spawn_ command now supports either a quantity argument or a --place (-p) option for manual placing of the mob."
+            +"\n_- spawn_ command now supports methods, which are called directly after placing the mob."
+            +"\n_-_ When calling methods that yield output, the output is now displayed in the game log."
+            +"\n_-_ Scroll of Debug is now considered unique, and thus will not burn."
+            +"\n_-_ Fixed more bugs in class finding for jar version caused by 0.3."
+            +"\n_-_ Fixed Hero method arguments not being automatically resolved to the hero."
+        +"\n\n\n_0.3.3_:"
+            +"\n_-_ Scroll Of Debug now automatically adds itself to the first open quickslot, rather than always quickslot #3."
+        +"\n_0.3.1, 0.3.2_:"
+            +"\n_-_ Fixed faulty package logic caused by 0.3.0"
+        +"\n_0.3.0_:"
+            +"\n_-_ Scroll of Debug now works on Android";
 }
