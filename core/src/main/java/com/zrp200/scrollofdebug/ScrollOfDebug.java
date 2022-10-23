@@ -36,7 +36,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 // WndTextInput (added in v0.9.4)
-import com.shatteredpixel.shatteredpixeldungeon.ui.WndTextInput;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
 // Output
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 
@@ -44,8 +44,7 @@ import com.watabou.noosa.ui.Component;
 import com.watabou.utils.Callback;
 import com.watabou.utils.Reflection;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -53,9 +52,12 @@ import java.util.regex.Pattern;
 /**
  * Scroll of Debug uses ClassLoader to get every class that can be directly created and provides a command interface with which to interact with them.
  *
+ *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v0.4.0
+ * @version v1.1.0
+ *
+ * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ScrollOfDebug extends Scroll {
@@ -71,67 +73,98 @@ public class ScrollOfDebug extends Scroll {
     private enum Command {
         HELP(null, // ...
                 "[COMMAND | all]",
-                "Gives more information on commands, or in the case of 'all', all of them."),
+                "Gives more information on commands",
+                "Specifying a command after the help will give an explanation for how to use that command."),
         // todo add more debug-oriented commands
         CHANGES(null, "", "Gives a history of changes to Scroll of Debug."),
         // generation commands.
         GIVE(Item.class,
-                "ITEM [_+_LEVEL] [_x_QUANTITY] [-f | --force] [ METHOD [args] ]",
-                "Creates and puts into your inventory the generated item."),
+                "<item> [+<level>] [x<quantity>] [-f|--force] [<method> [<args..>] ]",
+                "Creates and puts into your inventory the generated item",
+                "Any method specified will be called prior to collection.",
+                "Specifying _level_ will set the level of the item to the indicated amount using Item#level. This is the method called when restoring items from a save file. If it's not giving you want you want, please try passing \"upgrade\" <level> as your method.",
+                "_--force_ (or _-f_ for short) will disable all on-pickup logic (specifically Item#doPickUp) that may be affecting how the item gets collected into your inventory."),
         SPAWN(Mob.class,
-                "MOB [_x_QUANTITY | -p | --place]",
-                "Summons the indicated mob and randomly places them on the depth. -p allows manual placement, though cannot be combined with a quantity argument."),
+                "<mob> [x<quantity>|(-p|--place)] [<method>]",
+                "Creates the indicated mob and places them on the depth.",
+                "Specifying [quantity] will attempt to spawn that many mobs ",
+                "_-p_ allows manual placement, though it cannot be combined with a quantity argument."),
         SET(Trap.class,
-                "TRAP",
+                "<trap>",
                 "Sets a trap at an indicated position"),
         AFFECT(Buff.class,
-                "BUFF [duration] [METHOD [args]]",
-                "Allows you to attach a buff to a character in sight."),
+                "<buff> [<duration>] [<method> [<args..>]]",
+                "Allows you to attach a buff to a character in sight.",
+                "This can be potentially hazardous if a buff is applied to something that it was not designed for.",
+                "Specifying _duration_ will attempt to set the duration of the buff. In the cases of buffs that are active in nature (e.g. buffs.Burning), you may need to call a method to properly set its duration.",
+                "The method is called after the buff is attached, or on the existing buff if one existed already. This means you can say \"affect doom detach\" to remove doom from that character."),
         SEED(Blob.class,
-                "BLOB [amount]",
-                "Seeds a blob of the specified amount to a targeted tile"),
-        USE(Object.class, "CLASS method [args]", "Use a specified method from a desired class.", false),
-        INSPECT(Object.class, "CLASS", "Gives a list of supported methods for the indicated class.", false);
+                "<blob> [<amount>]",
+                "Seed a blob of the specified amount to a targeted tile"),
+        USE(Object.class, "<object> method [args]", "Use a specified method from a desired class.",
+                "It may be handy to see _inspect_ to see usable methods for your object",
+                "If you set a variable from this command, the return value of the method will be stored into the variable."),
+        INSPECT(Object.class, "<object>", "Gives a list of supported methods for the indicated class."),
+        VARIABLES(null,
+                "_@_<variable> [ [COMMAND ...] | i[nv] | c[ell] ]",
+                "store game objects for later use as method targets or parameters",
+                "The variables can be referenced later with their names for the purposes of methods from commands, as well as the _use_ and _inspect_ commands.",
+                "You can see all active variable names by typing _@_.",
+                "Specifying \"inv\" (or \"i\") will have the game prompt you to select an item from your inventory.",
+                "Specifying \"cell\" (or \"c\") will allow you to select a tile. ",
+                "When selecting a cell, you may or may not be able to directly select things in the tile you select, depending on the Scroll of Debug implementation.",
+                "Please note that variables are not saved when you close the game."
+        );
 
         final Class<?> paramClass;
-        final String syntax, description;
-        final boolean includeUses;
-        Command(Class<?> paramClass, String syntax, String description, boolean includeUses) {
+        final String syntax;
+        // a short description intended to fit on one line.
+        final String summary;
+        // more details on usage. a length of 1 will be treated as an extended description, more will be treated as a list.
+        final String[] notes;
+
+        Command(Class<?> paramClass, String syntax, String summary, String... notes) {
             this.paramClass = paramClass;
             this.syntax = syntax;
-            this.description = description;
-            this.includeUses = includeUses;
-        }
-        Command(Class<?> paramClass, String syntax, String description) {
-            this(paramClass,syntax,description,true);
+            this.summary = summary;
+            this.notes = notes;
         }
 
         @Override public String toString() { return name().toLowerCase(); }
 
-        String documentation() { return documentation(this, syntax, description); }
+        String documentation() { return documentation(this, syntax, summary); }
         static String documentation(Object command, String syntax, String description) {
             return String.format("_%s_ %s\n%s", command, syntax, description);
         }
 
         // adds more information depending on what the paramClass actually is.
-        String fullDocumentation(PackageTrie trie) {
+        String fullDocumentation(PackageTrie trie, boolean showClasses) {
             String documentation = documentation();
-            if(paramClass != null && includeUses) {
+            if(notes.length > 0) {
+                documentation += "\n";
+                if(notes.length == 1) documentation += "\n" + notes[0];
+                else for(String note : notes) documentation += "\n_-_ " + note;
+            }
+            if(showClasses && paramClass != null && !paramClass.isPrimitive() && paramClass != Object.class) {
                 documentation += "\n\n_Valid Classes_:" + listAllClasses(trie,paramClass);
             }
             return documentation;
         }
+        String fullDocumentation(PackageTrie trie) { return fullDocumentation(trie, true); }
 
 
         static Command get(String string) { try {
-            return valueOf(string.toUpperCase());
+            return string.equals("@") ? VARIABLES
+                    : valueOf(string.toUpperCase());
         } catch (Exception e) { return null; } }
     }
+
+    private String storeLocation;
 
     @Override
     public void doRead() {
         collect(); // you don't lose scroll of debug.
-        GameScene.show(new WndTextInput("Enter Command:", "", 100, false,
+        GameScene.show(new WndTextInput("Enter Command:", null, "", 100, false,
                 "Execute", "Cancel") {
             @Override public void onSelect(boolean positive, String text) {
                 if(!positive) return;
@@ -147,8 +180,44 @@ public class ScrollOfDebug extends Scroll {
                 }
                 lastCommand = text;
 
-                String[] input = text.split(" ");
+                String[] initialInput = text.split(" ");
                 Callback init = null;
+
+                final String[] input;
+
+                storeLocation = null;
+                if(initialInput.length > 0 && initialInput[0].startsWith(Variable.MARKER)) {
+                    // drop from the start, save for later.
+                    storeLocation = initialInput[0];
+                    if(storeLocation.length() == 1) {
+                        if(initialInput.length > 1) GLog.w("warning: remaining arguments were discarded");
+                        // list them all
+                        StringBuilder s = new StringBuilder();
+                        for(Map.Entry e : Variable.getActive().entrySet()) {
+                            s.append("\n_").append(e.getKey()).append("_ - ").append(e.getValue());
+                        }
+                        GameScene.show(new HelpWindow("Active Variables: \n" + s));
+                        return;
+                    }
+                    input = Arrays.copyOfRange(initialInput, 1, initialInput.length);
+
+                    // variable-specific actions
+                    if(input.length == 0){
+                        GLog.i("%s = %s", storeLocation, Variable.get(storeLocation));
+                        return;
+                    }
+                    String vCommand = input[0].toLowerCase();
+                    if(vCommand.matches("i(nv(entory)?)?")) {
+                        Variable.putFromInventory(storeLocation);
+                        return;
+                    } else if(vCommand.matches("c(ell)?")) {
+                        Variable.putFromCell(storeLocation);
+                        return;
+                    }
+
+                } else input = initialInput;
+
+                if(input.length == 0) return;
 
                 Command command; try { command = Command.valueOf(input[0].toUpperCase()); }
                 catch (Exception e) {
@@ -174,18 +243,21 @@ public class ScrollOfDebug extends Scroll {
                             if (all) {
                                 // extensive. help is omitted because we are using help.
                                 if (cmd != Command.HELP) {
-                                    builder.append("\n\n").append(cmd.fullDocumentation(trie));
+                                    builder.append("\n\n")
+                                            .append(cmd.fullDocumentation(trie, false));
                                 }
                             } else {
-                                // by default attempt to shorten the command list as much as possible.
-                                builder.append(String.format("\n_%s_: %s", cmd, cmd.description));
+                                // use documentation. (show syntax in addition to description)
+                                builder.append('\n').appendLine(cmd.documentation());
                             }
                         }
                         output = builder.toString().trim();
                     }
                     GameScene.show(new HelpWindow(output));
                 } else if(input.length > 1) {
-                    Class _cls = trie.findClass(input[1], command.paramClass);
+                    Object storedVariable = Variable.get(input[1]);
+                    Class _cls = storedVariable != null ? storedVariable.getClass()
+                            : trie.findClass(input[1], command.paramClass);
 
                     if(command == Command.INSPECT) {
                         Class cls = _cls;
@@ -196,17 +268,64 @@ public class ScrollOfDebug extends Scroll {
                         if(cls != null) {
                             StringBuilder message = new StringBuilder();
                             for(Map.Entry<Class,Set<Method>> entry : hierarchy(cls).entrySet()) {
-                                String className = entry.getKey().getName();
+                                Class inspecting = entry.getKey();
+                                String className = inspecting.getName();
                                 int i = className.indexOf(ROOT);
                                 if(i == -1) continue;
                                 className = className.substring(i+ROOT.length()+1);
                                 message.append("\n\n_").append(className).append("_");
+                                Object[] enumConstants = inspecting.getEnumConstants();
+                                if(enumConstants != null) for(Object member : entry.getKey().getEnumConstants()) {
+                                    message.append("\n_->_ ").append(member.toString().replaceAll("_"," "));
+                                }
+                                for(Field f : inspecting.getFields()) {
+                                    if(f.isEnumConstant()) continue;
+                                    if(f.getDeclaringClass() != inspecting) continue;
+                                    int modifiers = f.getModifiers();
+                                    Class t = f.getType();
+                                    // wonder if this should be sorted (possibly static -> instance)
+                                    // also need to revisit the use of symbols, - is duplicated inappropriately.
+                                    message.append("\n_")
+                                            .append(Modifier.isStatic(modifiers) ? '-' : '#')
+                                            .append('_').append(f.getName().replaceAll("_"," "));
+                                    if(Modifier.isFinal(modifiers)) {
+                                        boolean showValue = Modifier.isStatic(modifiers);
+                                        if(showValue) try {
+                                            // no point in showing if we're just going to get a meaningless hash
+                                            showValue = t.isPrimitive()
+                                                    || t.getMethod("toString")
+                                                        .getDeclaringClass() != Object.class;
+                                        } catch (NoSuchMethodException e) { showValue = false; }
+                                        if(showValue) try {
+                                            message.append("=").append(f.get(null));
+                                        } catch (IllegalAccessException e) {/* do nothing*/}
+                                        else {
+                                            message.append(": ").append(t.getSimpleName());
+                                        }
+                                    } else {
+                                        // this signifies that the getter can be accessed this way. hopefully no one was dumb enough to duplicate the name.
+                                        message.append(" [<")
+                                                .append(f.getType().getSimpleName())
+                                                .append(">]");
+                                    }
+                                }
                                 for(Method m : entry.getValue()) {
                                     message.append("\n_").append(Modifier.isStatic(m.getModifiers()) ? '*' : '-').append("_")
                                             .append(m.getName());
-                                    for(Class p : m.getParameterTypes()) {
-                                        if(p == Hero.class) continue;
-                                        message.append(' ').append(p.getSimpleName().toUpperCase());
+                                    Class[] types = m.getParameterTypes();
+                                    int left = types.length;
+                                    for(Class c : m.getParameterTypes()) {
+                                        StringBuilder param = new StringBuilder("<");
+                                        param.append(c.getSimpleName().toLowerCase());
+                                        // varargs handling. Not supported, but...maybe someday?
+                                        if(--left == 0 && m.isVarArgs()) param.append("..");
+                                        param.append('>');
+                                        // optional handling, currently only hero is handled.
+                                        // todo have similar methods be merged, with the offending parameters marked as optional.
+                                        if(c == Hero.class || c != Object.class && c.isInstance(Dungeon.level)) {
+                                            param.insert(0,'[').append(']');
+                                        }
+                                        message.append(' ').append(param);
                                     }
                                 }
                             }
@@ -222,12 +341,16 @@ public class ScrollOfDebug extends Scroll {
                     if(command == Command.USE) {
                         // alias for inspect when not enough args.
                         if(input.length == 2) onSelect(true, "inspect " + input[1]);
-                        else if(!executeMethod(
-                                cls == Hero.class ? Dungeon.hero
-                                        : cls != null && canInstantiate(cls) ? Reflection.newInstance(cls)
-                                        : null,
-                                cls, input, 2)) {
-                            GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
+                        else {
+                            Object o =
+                                    storedVariable != null ? storedVariable : // use the variable if available.
+                                    cls == Hero.class ? Dungeon.hero :
+                                    cls != Object.class && cls != null && cls.isInstance(Dungeon.level) ? Dungeon.level :
+                                    cls != null && canInstantiate(cls) ? Reflection.newInstance(cls) :
+                                    null;
+                            if(!executeMethod(o, cls, input, 2)) {
+                                GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
+                            }
                         }
                         return;
                     }
@@ -235,6 +358,7 @@ public class ScrollOfDebug extends Scroll {
                     boolean valid = true;
                     Object o = null; try {
                         o = Reflection.newInstanceUnhandled(cls);
+                        if(o != null) Variable.put(storeLocation, o);
                     } catch (Exception e) { valid = false; }
                     if (valid) switch (command) {
                         case SPAWN: Mob mob = (Mob)o;
@@ -273,7 +397,7 @@ public class ScrollOfDebug extends Scroll {
                                         GameScene.add(mob);
                                         // doing this means that I can't actually let you select cells for methods; it'll be immediately cancelled.
                                         executeMethod(mob,input,3);
-                                        GLog.w("Summoned " + mob.name());
+                                        GLog.w("Spawned " + mob.name());
                                     }
                                 });
                             } else {
@@ -288,7 +412,7 @@ public class ScrollOfDebug extends Scroll {
                                     if(canExecute) canExecute = executeMethod(m, input, qSpecified?3:2);
                                 }
                                 spawned--;
-                                GLog.w("Summoned "
+                                GLog.w("Spawned "
                                         + mob.name()
                                         + (spawned == 1 ? "" : " x" + spawned)
                                 );
@@ -314,27 +438,30 @@ public class ScrollOfDebug extends Scroll {
                             // todo add enchants/glyphs for weapons/armor?
                             // process modifiers left to right (so later ones have higher precedence)
                             boolean collect = false;
-                            int last = 1;
-                            for(int i=2; i < input.length; i++) try {
+                            for(int i=2; i < input.length; i++) {
                                 if(input[i].startsWith("--force") || input[i].equalsIgnoreCase("-f")) {
                                     collect = true;
-                                    last = i;
                                 }
-                                else {
-                                    int number = Integer.parseInt(input[i].substring(1));
-                                    switch(input[i].toLowerCase(Locale.ENGLISH).charAt(0)) {
+                                else if(input[i].matches("[\\-x+]\\d+")) {
+                                    switch (input[i].charAt(0)) {
                                         case 'x':
-                                            item.quantity(number);
-                                            last = i;
+                                            item.quantity(Integer.parseInt(input[i].substring(1)));
                                             break;
+                                        case '-':
                                         case '+':
-                                            item.level(number);
-                                            last = i;
+                                            item.level(Integer.parseInt(input[i]));
                                             break;
                                     }
                                 }
-                            } catch (NumberFormatException e) {/* do nothing */}
-                            if(++last < input.length) executeMethod(item, input, last);
+                                else {
+                                    if(!executeMethod(item,input,i)) {
+                                        GLog.w("Unrecognized option or method '%s'", input[i]);
+                                        onSelect(true, "help " + input[0]);
+                                        return;
+                                    }
+                                    break;
+                                }
+                            }
                             Item toPickUp = collect ? new Item() {
                                 // create wrapper item that simulates doPickUp while actually just calling collect.
                                 { image = item.image; }
@@ -442,11 +569,13 @@ public class ScrollOfDebug extends Scroll {
     }
     @Override public String desc() {
         StringBuilder builder = new StringBuilder();
-        builder.append("A scroll that gives you great power, letting you create virtually any item or mob in the game.")
-                .append("\n\nCommands:");
-        for(Command cmd : Command.values()) builder.append("\n\n_-_ ").append(cmd.documentation());
-        return builder.append("\n"
-                + "\nPlease note that some possible inputs may crash the game or cause other unexpected behavior, especially if they weren't intended to be created spontaneously.")
+        builder.appendLine("A scroll that gives you great power, letting you create virtually any item or mob in the game.")
+                .appendLine("\nSupported Commands:");
+        for(Command cmd : Command.values()) builder.appendLine(
+                // this should hopefully fit on one line.
+                String.format("_- %s_: %s", cmd, cmd.summary)
+        );
+        return builder.append("\nPlease note that some possible inputs may crash the game or cause other unexpected behavior, especially if their targets weren't intended to be created or otherwise used arbitrarily.")
                 .toString();
     }
     @Override public boolean isIdentified() {
@@ -457,6 +586,8 @@ public class ScrollOfDebug extends Scroll {
         unique = true;
     }
 
+
+    // todo change return type to integer to indicate how many spaces were used, possibly add option to force all to be used. This would allow stacking.
     // variant that derives class from the object given
     <T> boolean executeMethod(T obj, String methodName, String... args) {
         return executeMethod(obj, (Class<T>)obj.getClass(), methodName, args);
@@ -466,6 +597,7 @@ public class ScrollOfDebug extends Scroll {
     <T> boolean executeMethod(T obj, Class<? super T> cls, String methodName, String... args) {
         ArrayList<Method> methods = new ArrayList<>();
         for(Method method : cls.getMethods()) {
+            if(args.length > method.getParameterTypes().length) continue; // prevents arbitrary hiding.
             if(method.getName().equalsIgnoreCase(methodName)) methods.add(method);
         }
         Collections.sort(methods, (m1, m2) -> m2.getParameterTypes().length - m1.getParameterTypes().length );
@@ -473,16 +605,36 @@ public class ScrollOfDebug extends Scroll {
             Object[] arguments = getArguments(method.getParameterTypes(), args);
             Object result = method.invoke(obj, arguments);
             if(result != null) {
-                String argsAsString = Arrays.deepToString(arguments);
-                GLog.w("%s%s%s(%s): %s",
-                        cls.getSimpleName(),
-                        Modifier.isStatic(method.getModifiers()) ? '.' : '#',
-                        method.getName(),
-                        // snip first and last brace
-                        argsAsString.substring(1,argsAsString.length()-1), result);
+                printMethodOutput(cls,method,method.getModifiers(),result,arguments);
+                if(storeLocation != null) Variable.put(storeLocation, result);
             }
             return true;
         } catch (Exception e) {/*do nothing */}
+        // check if it is actually a field.
+        try {
+            Field field = null;
+            // this is needed because it's currently not case sensitive, while getField() is.
+            for(Field f : cls.getFields()) {
+                if(f.getName().equalsIgnoreCase(methodName)) {
+                    field = f;
+                    break;
+                }
+            }
+            if(field == null) return false;
+            Object result;
+            if(args.length == 0) {
+                result = field.get(obj);
+            }
+            // fixme this will need to be revisited when I implement stacking of methods
+            else if(args.length == 1) {
+                // convert the argument to a proper object and assign
+                // fixme should not have to do this much wrangling
+                field.set(obj, result=getArguments(new Class[]{field.getType()}, args)[0]);
+            } else throw new IllegalArgumentException();
+            if(storeLocation != null) Variable.put(storeLocation, result);
+            printMethodOutput(cls,field,field.getModifiers(), result);
+            return true;
+        } catch(Exception e) {/*not a valid match*/}
         return false;
     }
     // shortcut methods that interpret input to get the arguments needed
@@ -494,26 +646,45 @@ public class ScrollOfDebug extends Scroll {
     }
     <T> boolean executeMethod(T obj, String[] input, int startIndex) { return executeMethod(obj, (Class<T>)obj.getClass(), input, startIndex); }
 
+    // prints out the result of a method call.
+    static void printMethodOutput(Class cls, Member m, int modifiers, Object result, Object... arguments) {
+        String argsAsString = Arrays.deepToString(arguments);
+        String argFormat = m instanceof Method ? "(%5$s):" : " =";
+        GLog.w("%s%s%s"+argFormat+" %4$s",
+                cls.getSimpleName(),
+                Modifier.isStatic(modifiers) ? '.' : '#',
+                m.getName(),
+                // this displays arrays properly.
+                result.getClass().isArray() ? Arrays.deepToString((Object[])result) : result,
+                // snip first and last brace
+                argsAsString.substring(1,argsAsString.length()-1)
+        );
+    }
+
     // throws an exception if it fails. This removes the need for me to handle errors at all.
     Object[] getArguments(Class[] params, String[] input) throws Exception {
+        // todo make a #getArgument(Class, String... input)
         Object[] args = new Object[params.length];
         int j = 0;
-        // currently not implemented.
-        IntMap<Class> delayedChecks = new IntMap<>();
         for(int i=0; i < params.length; i++) {
             Class type = params[i];
-            if (type == int.class || type == Integer.class) {
-                // could be a cell.
-                if(input[j].equalsIgnoreCase("cell")) delayedChecks.put(i,Integer.class);
-                else args[i] = Integer.parseInt(input[j]);
-                j++;
+            args[i] = Variable.get(input[j], type);
+            if(args[i] != null) j++; // successful variable call.
+            else if (type == int.class || type == Integer.class) {
+                args[i] = Integer.parseInt(input[j++]);
             }
             else if (type == float.class || type == Float.class)
                 args[i] = Float.parseFloat(input[j++]);
             else if (type == String.class)
                 args[i] = input[j++];
             else if (type == Boolean.class || type == boolean.class)
-                args[i] = Boolean.getBoolean(input[j++]);
+                args[i] = Boolean.parseBoolean(input[j++]);
+            else if(input[j].equalsIgnoreCase("null")) {
+                // sometimes you want this.
+                args[i] = null;
+                j++;
+                continue;
+            }
             else if (Enum.class.isAssignableFrom(type)) {
                 for (String name : new String[]{
                         input[j], input[j].toUpperCase(), input[j].toLowerCase()
@@ -523,20 +694,32 @@ public class ScrollOfDebug extends Scroll {
                     } catch (IllegalArgumentException e) {/*continue*/}
                 j++;
             }
-            else if(Char.class.isAssignableFrom(type)) {
-                // two subclasses, which means two possible ways for this to go.
-                if(j < input.length && type.isAssignableFrom(Hero.class) && input[j].equalsIgnoreCase("hero")) {
-                    params[i] = Hero.class;
-                    j++;
+            else {
+                // non-primitive object retrieval
+                if(Char.class.isAssignableFrom(type)) {
+                    // two subclasses, which means two possible ways for this to go.
+                    if (type.isAssignableFrom(Hero.class) && input[j].equalsIgnoreCase("hero")) {
+                        params[i] = Hero.class;
+                        j++;
+                    }
                 }
-                if(type == Hero.class) args[i] = curUser; // autofill
-                else delayedChecks.put(i, type);
-            } else args[i] = Class.class.isAssignableFrom(type)
-                    ? trie.findClass(input[j++], Object.class)
-                    : Reflection.newInstanceUnhandled(trie.findClass(input[j++], type));
-            if (args[i] == null && !delayedChecks.containsKey(i)) throw new IllegalArgumentException();
+                else if(type != Object.class && type.isInstance(Dungeon.level)) {
+                    if(input[j].equals("level")) j++; // for easier understanding.
+                    args[i] = Dungeon.level;
+                    continue;
+                }
+
+                // todo add level autofill
+                args[i] =
+                        type == Hero.class ? curUser :// autofill hero
+                        Class.class.isAssignableFrom(type) ? trie.findClass(input[j++], Object.class) :
+                        type != Object.class && type.isInstance(Dungeon.level) ? Dungeon.level : // todo add handling if it is in fact passed
+                        // blindly instantiate, any error indicates invalid method.
+                        Reflection.newInstanceUnhandled(trie.findClass(input[j++], type));
+            }
+            // todo determine the exact cases where this is reached.
+            if (args[i] == null) throw new IllegalArgumentException();
         }
-        if(delayedChecks.notEmpty()) throw new IllegalArgumentException(); // currently not supported. logic would go here though.
         return args;
     }
 
@@ -624,24 +807,17 @@ public class ScrollOfDebug extends Scroll {
     // including RKPD2 scrolling window code.
     private static class HelpWindow extends Window {
         private static final int WIDTH_MIN=120, WIDTH_MAX=220;
+        ScrollPane scrollPane;
         HelpWindow(String message) {
             int width = WIDTH_MIN;
 
             RenderedTextBlock text = PixelScene.renderTextBlock(6);
             text.text(message, width);
-            //text.setPos(titlebar.left(), titlebar.bottom() + 2 * GAP);
-
             while (PixelScene.landscape()
                     && text.bottom() > (PixelScene.MIN_HEIGHT_L - 10)
                     && width < WIDTH_MAX) {
                 text.maxWidth(width += 20);
             }
-
-            //Component comp = new Component();
-            //comp.add(text);
-            //text.setPos(0, GAP);
-            //comp.setSize(text.width(), text.height() + GAP * 2);
-            //resize(width, (int) Math.min((int) comp.bottom() + 2 + titlebar.height() + GAP, maxHeight()));*/
 
             int height = (int)text.bottom();
             int maxHeight = (int)(PixelScene.uiCamera.height * 0.9);
@@ -649,17 +825,33 @@ public class ScrollOfDebug extends Scroll {
             if(needScrollPane) height = maxHeight;
             resize((int)text.width(), height);
             if(needScrollPane) {
-                Component wrapper = new Component();
-                wrapper.setSize(text.width(), text.height());
-                ScrollPane sp = new ScrollPane(wrapper);
-                add(sp);
-                wrapper.add(text);
-                text.setPos(0,0);
-                sp.setSize(wrapper.width(), height);
+                add(scrollPane = new ScrollPane(new Component()) {
+                    {
+                        content.add(text);
+                    }
+                    // vertical margin is required to prevent text from getting cut off.
+                    final float VERTICAL_MARGIN = 1;
+                    @Override
+                    protected void layout() {
+                        text.setPos(0, VERTICAL_MARGIN);
+                        // also set the width of the scroll pane
+                        content.setSize(width = text.right(), text.bottom()+VERTICAL_MARGIN);
+                        width += 2; // padding on the right to cause the controller to be flush against the window.
+                        super.layout();
+                    }
+                });
+                scrollPane.setSize(width, height);
             }
             else {
                 add(text);
             }
+        }
+
+        @Override // this should be removed for pre-v1.2 builds, this method was added in v1.2
+        public void offset(int xOffset, int yOffset) {
+            super.offset(xOffset, yOffset);
+            // this prevents issues in the full ui mode.
+            if(scrollPane != null) scrollPane.setSize(scrollPane.width(), scrollPane.height());
         }
     }
 
@@ -671,7 +863,35 @@ public class ScrollOfDebug extends Scroll {
     }
 
     private static final String CHANGELOG
-        = "_0.4.0_:"
+        = ""
+        +"_1.2.0_:"
+            +"\n_-_ Implemented variables! You are now able to store the result of commands that create game objects, as well as anything generated from the use command. You can also store stuff from the map (variable name followed by 'cell' or 'c') and your inventory (variable name followed by 'inv' or 'i')."
+            +"\n_-_ Adjusted some descriptions of commands, and added more detail to their extended descriptions."
+            +"\n_- help all_ no longer displays all usable classes for every command. To get the functionality, please use _help <command>_."
+            +"\n_- For methods, Level arguments are now optional (autofilled with Dungeon.level)"
+            +"\n_-_ You can now pass 'null' to methods."
+            +"\n_-_ Fixed info window for Scroll of Debug being too big for most devices."
+            +"\n_-_ Fixed cases where hero wouldn't be inferred when used in methods"
+            +"\n_-_ Fixed not being able to pass true to methods expecting true or false"
+        +"\n\n"
+        +"_1.1.1_:"
+            +"\n_-_ methods that have less parameters than given arguments are now ignored, preventing inappropriate hiding of fields"
+            +"\n_-_ fields are no longer case sensitive"
+            +"\n_-_ fixed bug making inspection field types way longer"
+            +"\n_-_ Fixed scrollpane issues. Really."
+            +"\n_-_ There is, however, a bug caused by resizing your window while a help window is active. So don't do that."
+        +"\n\n_1.1.0_:"
+            +"\n_-_ Actually fixed scrollpane issues this time"
+            +"\n_-_ Added the ability to retrieve and set public fields of objects, though such functionality cannot be used to pass them to methods at this time."
+        +"\n\n_1.0.0_:"
+            +"\n_-_ Changes to Shattered Pixel Dungeon in v1.3.0 mean scroll of debug no longer directly supports versions before it."
+            +"\n_-_ Changed formatting style of commands."
+            +"\n_-_ Enumerated types now list their values in _inspect_"
+            +"\n_- give_ now only requires a - to give degraded items, rather than +-"
+            +"\n_- give_ now rejects more invalid inputs."
+            +"\n_-_ Scroll of Debug's add implementation only triggers when it is not in the player's inventory."
+            +"\n_-_ Fixed scrollpanes being offset incorrectly in full shpd view"
+        +"\n\n\n_0.4.0_:"
             +"\n_-_ Added this command."
             +"\n_-_ Added _use_ command, which can call a desired method on any game class that supports it (see _inspect_ for valid methods)."
             +"\n_-_ Including _!!_ in a command will replace it with the previously written command."
