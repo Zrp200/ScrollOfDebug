@@ -36,7 +36,7 @@ import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ScrollPane;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Window;
 // WndTextInput (added in v0.9.4)
-import com.shatteredpixel.shatteredpixeldungeon.windows.WndTextInput;
+import com.shatteredpixel.shatteredpixeldungeon.ui.WndTextInput;
 // Output
 import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 
@@ -164,7 +164,7 @@ public class ScrollOfDebug extends Scroll {
     @Override
     public void doRead() {
         collect(); // you don't lose scroll of debug.
-        GameScene.show(new WndTextInput("Enter Command:", null, "", 100, false,
+        GameScene.show(new WndTextInput("Enter Command:", "", 100, false,
                 "Execute", "Cancel") {
             @Override public void onSelect(boolean positive, String text) {
                 if(!positive) return;
@@ -845,13 +845,6 @@ public class ScrollOfDebug extends Scroll {
             else {
                 add(text);
             }
-        }
-
-        @Override // this should be removed for pre-v1.2 builds, this method was added in v1.2
-        public void offset(int xOffset, int yOffset) {
-            super.offset(xOffset, yOffset);
-            // this prevents issues in the full ui mode.
-            if(scrollPane != null) scrollPane.setSize(scrollPane.width(), scrollPane.height());
         }
     }
 
