@@ -197,8 +197,7 @@ public class GameScene extends PixelScene {
 				if(!debug.collect()) Dungeon.hero.belongings.backpack.items.add(debug);
 			}
 			if(!Dungeon.quickslot.contains(debug)) {
-				int slot = 0;
-				while(slot < Dungeon.quickslot.SIZE) if(Dungeon.quickslot.getItem(slot) == null) {
+				for(int slot = 0; slot < Dungeon.quickslot.SIZE; slot++) if(Dungeon.quickslot.getItem(slot) == null) {
 					Dungeon.quickslot.setSlot(slot, debug);
 					break;
 				}
