@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -153,6 +153,10 @@ public class Visual extends Gizmo {
 				x + (width() - v.width())/2f,
 				y + (height() - v.height())/2f
 		);
+	}
+
+	public void originToCenter() {
+		origin.set(width / 2, height / 2);
 	}
 	
 	public float width() {

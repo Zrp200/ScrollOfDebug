@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ public class SkeletonKey extends Key {
 	}
 
 	@Override
-	public boolean doPickUp(Hero hero) {
+	public boolean doPickUp(Hero hero, int pos) {
 		if(!SPDSettings.supportNagged()){
 			try {
 				Dungeon.saveAll();
@@ -64,7 +64,7 @@ public class SkeletonKey extends Key {
 			
 		}
 		
-		return super.doPickUp(hero);
+		return super.doPickUp(hero, pos);
 	}
 
 }

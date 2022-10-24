@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -142,6 +142,10 @@ public class RectF {
 	
 	public RectF shrink() {
 		return shrink( 1 );
+	}
+
+	public RectF scale( float d ){
+		return new RectF( left * d, top * d, right * d, bottom * d );
 	}
 	
 }

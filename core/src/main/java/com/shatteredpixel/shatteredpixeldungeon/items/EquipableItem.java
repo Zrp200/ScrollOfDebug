@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -53,8 +53,8 @@ public abstract class EquipableItem extends Item {
 	}
 
 	@Override
-	public boolean doPickUp(Hero hero) {
-		if (super.doPickUp(hero)){
+	public boolean doPickUp(Hero hero, int pos) {
+		if (super.doPickUp(hero, pos)){
 			if (!isIdentified() && !Document.ADVENTURERS_GUIDE.isPageRead(Document.GUIDE_IDING)){
 				GLog.p(Messages.get(Guidebook.class, "hint"));
 				GameScene.flashForDocument(Document.GUIDE_IDING);

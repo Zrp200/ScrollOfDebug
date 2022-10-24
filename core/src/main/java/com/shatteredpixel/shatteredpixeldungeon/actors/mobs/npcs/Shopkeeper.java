@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +22,9 @@
 package com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.ElmoParticle;
@@ -51,6 +53,11 @@ public class Shopkeeper extends NPC {
 
 		if (Dungeon.level.heroFOV[pos]){
 			Notes.add(Notes.Landmark.SHOP);
+		}
+
+		if (Statistics.highestAscent < 20 && Dungeon.hero.buff(AscensionChallenge.class) != null){
+			flee();
+			return true;
 		}
 		
 		sprite.turnTo( pos, Dungeon.hero.pos );
@@ -107,6 +114,14 @@ public class Shopkeeper extends NPC {
 		return GameScene.selectItem( itemSelector );
 	}
 
+	public static boolean canSell(Item item){
+		if (item.value() <= 0)                                              return false;
+		if (item.unique && !item.stackable)                                 return false;
+		if (item instanceof Armor && ((Armor) item).checkSeal() != null)    return false;
+		if (item.isEquipped(Dungeon.hero) && item.cursed)                   return false;
+		return true;
+	}
+
 	private static WndBag.ItemSelector itemSelector = new WndBag.ItemSelector() {
 		@Override
 		public String textPrompt() {
@@ -115,11 +130,7 @@ public class Shopkeeper extends NPC {
 
 		@Override
 		public boolean itemSelectable(Item item) {
-			if (item.value() <= 0)                                              return false;
-			if (item.unique && !item.stackable)                                 return false;
-			if (item instanceof Armor && ((Armor) item).checkSeal() != null)    return false;
-			if (item.isEquipped(Dungeon.hero) && item.cursed)                   return false;
-			return true;
+			return Shopkeeper.canSell(item);
 		}
 
 		@Override

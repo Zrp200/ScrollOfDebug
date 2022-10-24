@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -30,6 +30,7 @@ import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
+import com.shatteredpixel.shatteredpixeldungeon.ui.HeroIcon;
 import com.shatteredpixel.shatteredpixeldungeon.ui.IconButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
@@ -46,7 +47,7 @@ public class WndChooseAbility extends Window {
 
 		super();
 
-		//crown can be null if hero is choosing from armor, pre-0.9.3 saves
+		//crown can be null if hero is choosing from armor
 		IconTitle titlebar = new IconTitle();
 		titlebar.icon( new ItemSprite( crown == null ? armor.image() : crown.image(), null ) );
 		titlebar.label( Messages.titleCase(crown == null ? armor.name() : crown.name()) );
@@ -68,7 +69,7 @@ public class WndChooseAbility extends Window {
 			RedButton abilityButton = new RedButton(ability.shortDesc(), 6){
 				@Override
 				protected void onClick() {
-					GameScene.show(new WndOptions( new ItemSprite( crown == null ? armor.image() : crown.image(), null ),
+					GameScene.show(new WndOptions( new HeroIcon( ability ),
 							Messages.titleCase(ability.name()),
 							Messages.get(WndChooseAbility.this, "are_you_sure"),
 							Messages.get(WndChooseAbility.this, "yes"),

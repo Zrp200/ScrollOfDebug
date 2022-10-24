@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.SPDAction;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
+import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.watabou.input.GameAction;
 
 public class LootIndicator extends Tag {
@@ -37,7 +38,7 @@ public class LootIndicator extends Tag {
 	public LootIndicator() {
 		super( 0x1F75CC );
 		
-		setSize( 24, 24 );
+		setSize( SIZE, SIZE );
 		
 		visible = false;
 	}
@@ -48,7 +49,7 @@ public class LootIndicator extends Tag {
 
 		slot = new ItemSlot() {
 			protected void onClick() {
-				if (Dungeon.hero.handle(Dungeon.hero.pos)){
+				if (Dungeon.hero.ready && Dungeon.hero.handle(Dungeon.hero.pos)){
 					Dungeon.hero.next();
 				}
 
@@ -58,6 +59,11 @@ public class LootIndicator extends Tag {
 			public GameAction keyAction() {
 				return SPDAction.TAG_LOOT;
 			}
+
+			@Override
+			public GameAction secondaryTooltipAction() {
+				return SPDAction.WAIT_OR_PICKUP;
+			}
 		};
 		slot.showExtraInfo( false );
 		add( slot );
@@ -66,8 +72,15 @@ public class LootIndicator extends Tag {
 	@Override
 	protected void layout() {
 		super.layout();
-		
-		slot.setRect( x + 2, y + 3, width - 3, height - 6 );
+
+		if (!flipped) {
+			slot.setRect( x, y, SIZE, height );
+			slot.setMargins(2, 2, 0, 2);
+		} else {
+			slot.setRect( x+(width()-SIZE), y, SIZE, height );
+			slot.setMargins(0, 2, 2, 2);
+		}
+
 	}
 	
 	@Override

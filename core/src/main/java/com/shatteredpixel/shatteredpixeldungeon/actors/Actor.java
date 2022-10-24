@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -85,6 +85,10 @@ public abstract class Actor implements Bundlable {
 
 	public void clearTime() {
 		time = 0;
+	}
+
+	public void timeToNow() {
+		time = now;
 	}
 	
 	protected void diactivate() {
@@ -180,6 +184,11 @@ public abstract class Actor implements Bundlable {
 		
 		for (Mob mob : Dungeon.level.mobs) {
 			add( mob );
+		}
+
+		//mobs need to remember their targets after every actor is added
+		for (Mob mob : Dungeon.level.mobs) {
+			mob.restoreEnemy();
 		}
 		
 		for (Blob blob : Dungeon.level.blobs.values()) {

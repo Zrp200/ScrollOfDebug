@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfRegrowth;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Blindweed;
-import com.shatteredpixel.shatteredpixeldungeon.plants.Dreamfoil;
+import com.shatteredpixel.shatteredpixeldungeon.plants.Mageroyal;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Earthroot;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Fadeleaf;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Firebloom;
@@ -93,6 +93,9 @@ public abstract class TippedDart extends Dart {
 					} else if (index == 1){
 						detach(hero.belongings.backpack);
 						if (!new Dart().collect()) Dungeon.level.drop(new Dart(), hero.pos).sprite.drop();
+
+						//reset durability if there are darts left in the stack
+						durability = MAX_DURABILITY;
 						
 						hero.spend( 1f );
 						hero.busy();
@@ -115,7 +118,7 @@ public abstract class TippedDart extends Dart {
 		if (durability <= 0){
 			//attempt to stick the dart to the enemy, just drop it if we can't.
 			Dart d = new Dart();
-			if (enemy.isAlive() && sticky) {
+			if (sticky && enemy != null && enemy.isAlive() && enemy.alignment != Char.Alignment.ALLY){
 				PinCushion p = Buff.affect(enemy, PinCushion.class);
 				if (p.target == enemy){
 					p.stick(d);
@@ -129,7 +132,7 @@ public abstract class TippedDart extends Dart {
 	private static int targetPos = -1;
 
 	@Override
-	protected float durabilityPerUse() {
+	public float durabilityPerUse() {
 		float use = super.durabilityPerUse();
 		
 		use /= (1 + Dungeon.hero.pointsInTalent(Talent.DURABLE_TIPS));
@@ -170,7 +173,7 @@ public abstract class TippedDart extends Dart {
 	private static HashMap<Class<?extends Plant.Seed>, Class<?extends TippedDart>> types = new HashMap<>();
 	static {
 		types.put(Blindweed.Seed.class,     BlindingDart.class);
-		types.put(Dreamfoil.Seed.class,     SleepDart.class);
+		types.put(Mageroyal.Seed.class,     CleansingDart.class);
 		types.put(Earthroot.Seed.class,     ParalyticDart.class);
 		types.put(Fadeleaf.Seed.class,      DisplacingDart.class);
 		types.put(Firebloom.Seed.class,     IncendiaryDart.class);

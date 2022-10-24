@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Recharging;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ScrollEmpower;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.SoulMark;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.mage.WildMagic;
@@ -215,10 +216,10 @@ public abstract class Wand extends Item {
 	}
 	
 	@Override
-	public Item identify() {
+	public Item identify( boolean byHero ) {
 		
 		curChargeKnown = true;
-		super.identify();
+		super.identify(byHero);
 		
 		updateQuickslot();
 		
@@ -282,7 +283,10 @@ public abstract class Wand extends Item {
 			curseInfusionBonus = false;
 			updateLevel();
 		}
-		return super.level() + resinBonus + (curseInfusionBonus ? 1 : 0);
+		int level = super.level();
+		if (curseInfusionBonus) level += 1 + level/6;
+		level += resinBonus;
+		return level;
 	}
 	
 	@Override
@@ -321,18 +325,18 @@ public abstract class Wand extends Item {
 
 		if (charger != null && charger.target != null) {
 			if (charger.target.buff(WildMagic.WildMagicTracker.class) != null){
-				int bonus = 2 + ((Hero)charger.target).pointsInTalent(Talent.WILD_POWER);
+				int bonus = 4 + ((Hero)charger.target).pointsInTalent(Talent.WILD_POWER);
 				if (Random.Int(2) == 0) bonus++;
-				bonus /= 2; // +1/+1.5/+2/+2.5/+3 at 0/1/2/3/4 talent points
+				bonus /= 2; // +2/+2.5/+3/+3.5/+4 at 0/1/2/3/4 talent points
 
-				int maxBonusLevel = 2 + ((Hero)charger.target).pointsInTalent(Talent.WILD_POWER);
+				int maxBonusLevel = 3 + ((Hero)charger.target).pointsInTalent(Talent.WILD_POWER);
 				if (lvl < maxBonusLevel) {
 					lvl = Math.min(lvl + bonus, maxBonusLevel);
 				}
 			}
 
 			if (charger.target.buff(ScrollEmpower.class) != null){
-				lvl += Dungeon.hero.pointsInTalent(Talent.EMPOWERING_SCROLLS);
+				lvl += 3;
 			}
 
 			WandOfMagicMissile.MagicCharge buff = charger.target.buff(WandOfMagicMissile.MagicCharge.class);
@@ -398,23 +402,39 @@ public abstract class Wand extends Item {
 		} else {
 			ScrollEmpower empower = curUser.buff(ScrollEmpower.class);
 			if (empower != null){
-				empower.detach();
+				empower.use();
 			}
 		}
 
-		//if the wand is owned by the hero, but not in their inventory, it must be in the staff
 		if (charger != null
-				&& charger.target == Dungeon.hero
-				&& !Dungeon.hero.belongings.contains(this)) {
-			if (curCharges == 0 && Dungeon.hero.hasTalent(Talent.BACKUP_BARRIER)) {
-				//grants 3/5 shielding
-				Buff.affect(Dungeon.hero, Barrier.class).setShield(1 + 2 * Dungeon.hero.pointsInTalent(Talent.BACKUP_BARRIER));
-			}
-			if (Dungeon.hero.hasTalent(Talent.EMPOWERED_STRIKE)){
-				Buff.prolong(Dungeon.hero, Talent.EmpoweredStrikeTracker.class, 10f);
+				&& charger.target == Dungeon.hero){
+
+			//if the wand is owned by the hero, but not in their inventory, it must be in the staff
+			if (!Dungeon.hero.belongings.contains(this)) {
+				if (curCharges == 0 && Dungeon.hero.hasTalent(Talent.BACKUP_BARRIER)) {
+					//grants 3/5 shielding
+					Buff.affect(Dungeon.hero, Barrier.class).setShield(1 + 2 * Dungeon.hero.pointsInTalent(Talent.BACKUP_BARRIER));
+				}
+				if (Dungeon.hero.hasTalent(Talent.EMPOWERED_STRIKE)) {
+					Buff.prolong(Dungeon.hero, Talent.EmpoweredStrikeTracker.class, 10f);
+				}
+
+			//otherwise process logic for metamorphed backup barrier
+			} else if (curCharges == 0
+					&& Dungeon.hero.heroClass != HeroClass.MAGE
+					&& Dungeon.hero.hasTalent(Talent.BACKUP_BARRIER)){
+				boolean highest = true;
+				for (Item i : Dungeon.hero.belongings.getAllItems(Wand.class)){
+					if (i.level() > level()){
+						highest = false;
+					}
+				}
+				if (highest){
+					//grants 3/5 shielding
+					Buff.affect(Dungeon.hero, Barrier.class).setShield(1 + 2 * Dungeon.hero.pointsInTalent(Talent.BACKUP_BARRIER));
+				}
 			}
 		}
-
 		Invisibility.dispel();
 		updateQuickslot();
 
@@ -558,7 +578,7 @@ public abstract class Wand extends Item {
 				
 				if (target == curUser.pos || cell == curUser.pos) {
 					if (target == curUser.pos && curUser.hasTalent(Talent.SHIELD_BATTERY)){
-						float shield = curUser.HT * (0.05f*curWand.curCharges);
+						float shield = curUser.HT * (0.04f*curWand.curCharges);
 						if (curUser.pointsInTalent(Talent.SHIELD_BATTERY) == 2) shield *= 1.5f;
 						Buff.affect(curUser, Barrier.class).setShield(Math.round(shield));
 						curWand.curCharges = 0;

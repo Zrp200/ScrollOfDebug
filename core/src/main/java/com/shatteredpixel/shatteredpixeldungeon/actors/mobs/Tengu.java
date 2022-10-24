@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Blob;
@@ -34,6 +35,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Blindness;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Doom;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Dread;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LockedFloor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Terror;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
@@ -100,7 +102,7 @@ public class Tengu extends Mob {
 	protected void onAdd() {
 		//when he's removed and re-added to the fight, his time is always set to now.
 		if (cooldown() > TICK) {
-			spend(-cooldown());
+			timeToNow();
 			spendToWhole();
 		}
 		super.onAdd();
@@ -208,6 +210,10 @@ public class Tengu extends Mob {
 		super.die( cause );
 		
 		Badges.validateBossSlain();
+		if (Statistics.qualifiedForBossChallengeBadge){
+			Badges.validateBossChallengeCompleted();
+		}
+		Statistics.bossScores[1] += 2000;
 		
 		LloydsBeacon beacon = Dungeon.hero.belongings.getItem(LloydsBeacon.class);
 		if (beacon != null) {
@@ -333,6 +339,7 @@ public class Tengu extends Mob {
 	
 	{
 		immunities.add( Blindness.class );
+		immunities.add( Dread.class );
 		immunities.add( Terror.class );
 	}
 	
@@ -603,15 +610,20 @@ public class Tengu extends Mob {
 					if (PathFinder.distance[cell] < Integer.MAX_VALUE) {
 						Char ch = Actor.findChar(cell);
 						if (ch != null && !(ch instanceof Tengu)) {
-							int dmg = Random.NormalIntRange(5 + Dungeon.depth, 10 + Dungeon.depth * 2);
+							int dmg = Random.NormalIntRange(5 + Dungeon.scalingDepth(), 10 + Dungeon.scalingDepth() * 2);
 							dmg -= ch.drRoll();
 
 							if (dmg > 0) {
 								ch.damage(dmg, Bomb.class);
 							}
 
-							if (ch == Dungeon.hero && !ch.isAlive()) {
-								Dungeon.fail(Tengu.class);
+							if (ch == Dungeon.hero){
+								Statistics.qualifiedForBossChallengeBadge = false;
+								Statistics.bossScores[1] -= 100;
+
+								if (!ch.isAlive()) {
+									Dungeon.fail(Tengu.class);
+								}
 							}
 						}
 
@@ -681,7 +693,7 @@ public class Tengu extends Mob {
 			}
 			
 			@Override
-			public boolean doPickUp( Hero hero ) {
+			public boolean doPickUp(Hero hero, int pos) {
 				GLog.w( Messages.get(this, "cant_pickup") );
 				return false;
 			}
@@ -799,14 +811,14 @@ public class Tengu extends Mob {
 		public void storeInBundle(Bundle bundle) {
 			super.storeInBundle(bundle);
 			bundle.put( DIRECTION, direction );
-			bundle.put( CUR_CELLS, curCells );
+			if (curCells != null) bundle.put( CUR_CELLS, curCells );
 		}
 		
 		@Override
 		public void restoreFromBundle(Bundle bundle) {
 			super.restoreFromBundle(bundle);
 			direction = bundle.getInt( DIRECTION );
-			curCells = bundle.getIntArray( CUR_CELLS );
+			if (bundle.contains( CUR_CELLS )) curCells = bundle.getIntArray( CUR_CELLS );
 		}
 		
 		public static class FireBlob extends Blob {
@@ -837,6 +849,10 @@ public class Tengu extends Mob {
 							Char ch = Actor.findChar( cell );
 							if (ch != null && !ch.isImmune(Fire.class) && !(ch instanceof Tengu)) {
 								Buff.affect( ch, Burning.class ).reignite( ch );
+							}
+							if (ch == Dungeon.hero){
+								Statistics.qualifiedForBossChallengeBadge = false;
+								Statistics.bossScores[1] -= 100;
 							}
 							
 							if (Dungeon.level.flamable[cell]){
@@ -1017,11 +1033,15 @@ public class Tengu extends Mob {
 							
 							Char ch = Actor.findChar(cell);
 							if (ch != null && !(ch instanceof Tengu)){
-								ch.damage(2 + Dungeon.depth, new Electricity());
+								ch.damage(2 + Dungeon.scalingDepth(), new Electricity());
 								
-								if (ch == Dungeon.hero && !ch.isAlive()) {
-									Dungeon.fail(Tengu.class);
-									GLog.n( Messages.get(Electricity.class, "ondeath") );
+								if (ch == Dungeon.hero){
+									Statistics.qualifiedForBossChallengeBadge = false;
+									Statistics.bossScores[1] -= 100;
+									if (!ch.isAlive()) {
+										Dungeon.fail(Tengu.class);
+										GLog.n(Messages.get(Electricity.class, "ondeath"));
+									}
 								}
 							}
 							
@@ -1056,7 +1076,7 @@ public class Tengu extends Mob {
 			}
 			
 			@Override
-			public boolean doPickUp( Hero hero ) {
+			public boolean doPickUp(Hero hero, int pos) {
 				GLog.w( Messages.get(this, "cant_pickup") );
 				return false;
 			}

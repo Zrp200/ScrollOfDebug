@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.items.scrolls;
 
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.QuickSlot;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Transmuting;
 import com.shatteredpixel.shatteredpixeldungeon.items.EquipableItem;
@@ -43,6 +44,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MagesStaff;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.melee.MeleeWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.Dart;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.TippedDart;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Catalog;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.plants.Plant;
@@ -62,7 +64,7 @@ public class ScrollOfTransmutation extends InventoryScroll {
 	@Override
 	protected boolean usableOnItem(Item item) {
 		return item instanceof MeleeWeapon ||
-				(item instanceof MissileWeapon && !(item instanceof Dart)) ||
+				(item instanceof MissileWeapon && (!(item instanceof Dart) || item instanceof TippedDart)) ||
 				(item instanceof Potion && !(item instanceof Elixir || item instanceof Brew || item instanceof AlchemicalCatalyst)) ||
 				item instanceof Scroll ||
 				item instanceof Ring ||
@@ -82,14 +84,26 @@ public class ScrollOfTransmutation extends InventoryScroll {
 			GLog.n( Messages.get(this, "nothing") );
 			curItem.collect( curUser.belongings.backpack );
 		} else {
-			if (item.isEquipped(Dungeon.hero)){
-				item.cursed = false; //to allow it to be unequipped
-				((EquipableItem)item).doUnequip(Dungeon.hero, false);
-				((EquipableItem)result).doEquip(Dungeon.hero);
-			} else {
-				item.detach(Dungeon.hero.belongings.backpack);
-				if (!result.collect()){
-					Dungeon.level.drop(result, curUser.pos).sprite.drop();
+			if (result != item) {
+				int slot = Dungeon.quickslot.getSlot(item);
+				if (item.isEquipped(Dungeon.hero)) {
+					item.cursed = false; //to allow it to be unequipped
+					((EquipableItem) item).doUnequip(Dungeon.hero, false);
+					((EquipableItem) result).doEquip(Dungeon.hero);
+					Dungeon.hero.spend(-Dungeon.hero.cooldown()); //cancel equip/unequip time
+				} else {
+					item.detach(Dungeon.hero.belongings.backpack);
+					if (!result.collect()) {
+						Dungeon.level.drop(result, curUser.pos).sprite.drop();
+					} else if (Dungeon.hero.belongings.getSimilar(result) != null){
+						result = Dungeon.hero.belongings.getSimilar(result);
+					}
+				}
+				if (slot != -1
+						&& result.defaultAction != null
+						&& !Dungeon.quickslot.isNonePlaceholder(slot)
+						&& Dungeon.hero.belongings.contains(result)){
+					Dungeon.quickslot.setSlot(slot, result);
 				}
 			}
 			if (result.isIdentified()){
@@ -104,7 +118,9 @@ public class ScrollOfTransmutation extends InventoryScroll {
 
 	public static Item changeItem( Item item ){
 		if (item instanceof MagesStaff) {
-			return changeStaff( (MagesStaff)item );
+			return changeStaff((MagesStaff) item);
+		}else if (item instanceof TippedDart){
+			return changeTippeDart( (TippedDart)item );
 		} else if (item instanceof MeleeWeapon || item instanceof MissileWeapon) {
 			return changeWeapon( (Weapon)item );
 		} else if (item instanceof Scroll) {
@@ -143,6 +159,15 @@ public class ScrollOfTransmutation extends InventoryScroll {
 		
 		return staff;
 	}
+
+	private static TippedDart changeTippeDart( TippedDart dart ){
+		TippedDart n;
+		do {
+			n = TippedDart.randomTipped(1);
+		} while (n.getClass() == dart.getClass());
+
+		return n;
+	}
 	
 	private static Weapon changeWeapon( Weapon w ) {
 		
@@ -158,8 +183,7 @@ public class ScrollOfTransmutation extends InventoryScroll {
 			n = (Weapon) Reflection.newInstance(c.classes[Random.chances(c.probs)]);
 		} while (Challenges.isItemBlocked(n) || n.getClass() == w.getClass());
 		
-		int level = w.level();
-		if (w.curseInfusionBonus) level--;
+		int level = w.trueLevel();
 		if (level > 0) {
 			n.upgrade( level );
 		} else if (level < 0) {
@@ -168,6 +192,7 @@ public class ScrollOfTransmutation extends InventoryScroll {
 		
 		n.enchantment = w.enchantment;
 		n.curseInfusionBonus = w.curseInfusionBonus;
+		n.masteryPotionBonus = w.masteryPotionBonus;
 		n.levelKnown = w.levelKnown;
 		n.cursedKnown = w.cursedKnown;
 		n.cursed = w.cursed;
@@ -221,9 +246,7 @@ public class ScrollOfTransmutation extends InventoryScroll {
 		} while ( Challenges.isItemBlocked(n) || n.getClass() == w.getClass());
 		
 		n.level( 0 );
-		int level = w.level();
-		if (w.curseInfusionBonus) level--;
-		level -= w.resinBonus;
+		int level = w.trueLevel();
 		n.upgrade( level );
 
 		n.levelKnown = w.levelKnown;
@@ -244,7 +267,7 @@ public class ScrollOfTransmutation extends InventoryScroll {
 		Plant.Seed n;
 		
 		do {
-			n = (Plant.Seed)Generator.random( Generator.Category.SEED );
+			n = (Plant.Seed)Generator.randomUsingDefaults( Generator.Category.SEED );
 		} while (n.getClass() == s.getClass());
 		
 		return n;
@@ -255,7 +278,7 @@ public class ScrollOfTransmutation extends InventoryScroll {
 		Runestone n;
 		
 		do {
-			n = (Runestone) Generator.random( Generator.Category.STONE );
+			n = (Runestone) Generator.randomUsingDefaults( Generator.Category.STONE );
 		} while (n.getClass() == r.getClass());
 		
 		return n;
@@ -280,5 +303,10 @@ public class ScrollOfTransmutation extends InventoryScroll {
 	@Override
 	public int value() {
 		return isKnown() ? 50 * quantity : super.value();
+	}
+
+	@Override
+	public int energyVal() {
+		return isKnown() ? 8 * quantity : super.energyVal();
 	}
 }

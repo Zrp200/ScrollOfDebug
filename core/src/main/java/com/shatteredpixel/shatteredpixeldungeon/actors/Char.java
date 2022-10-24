@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,11 +22,14 @@
 package com.shatteredpixel.shatteredpixeldungeon.actors;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Electricity;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Adrenaline;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ArcaneArmor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barkskin;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Berserk;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Bleeding;
@@ -40,6 +43,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corrosion;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Cripple;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Doom;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Dread;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.FireImbue;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Frost;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.FrostImbue;
@@ -48,6 +52,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Haste;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hex;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Hunger;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LifeLink;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LostInventory;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicalSleep;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Momentum;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Ooze;
@@ -69,17 +74,22 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.rogue.DeathMark;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.warrior.Endure;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Elemental;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.MirrorImage;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.PrismaticImage;
 import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.AntiMagic;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Potential;
+import com.shatteredpixel.shatteredpixeldungeon.items.potions.exotic.PotionOfCleansing;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfElements;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRetribution;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfPsionicBlast;
 import com.shatteredpixel.shatteredpixeldungeon.items.stones.StoneOfAggression;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFireblast;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfFrost;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfLightning;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfLivingEarth;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Blazing;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Blocking;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.enchantments.Grim;
@@ -305,7 +315,7 @@ public abstract class Char extends Actor {
 
 		} else if (hit( this, enemy, accMulti )) {
 			
-			int dr = enemy.drRoll();
+			int dr = Math.round(enemy.drRoll() * AscensionChallenge.statModifier(enemy));
 
 			Barkskin bark = enemy.buff(Barkskin.class);
 			if (bark != null)   dr += Random.NormalIntRange( 0 , bark.level() );
@@ -321,8 +331,10 @@ public abstract class Char extends Actor {
 					dr = 0;
 				}
 			}
-			
-			int dmg;
+
+			//we use a float here briefly so that we don't have to constantly round while
+			// potentially applying various multiplier effects
+			float dmg;
 			Preparation prep = buff(Preparation.class);
 			if (prep != null){
 				dmg = prep.damageRoll(this);
@@ -342,6 +354,13 @@ public abstract class Char extends Actor {
 				dmg *= 1.5f;
 			}
 
+			for (ChampionEnemy buff : buffs(ChampionEnemy.class)){
+				dmg *= buff.meleeDamageFactor();
+			}
+
+			dmg *= AscensionChallenge.statModifier(this);
+
+			//flat damage bonus is applied after positive multipliers, but before negative ones
 			dmg += dmgBonus;
 
 			//friendly endure
@@ -353,10 +372,19 @@ public abstract class Char extends Actor {
 			if (endure != null){
 				dmg = endure.adjustDamageTaken(dmg);
 			}
+
+			if (enemy.buff(ScrollOfChallenge.ChallengeArena.class) != null){
+				dmg *= 0.67f;
+			}
+
+			if ( buff(Weakness.class) != null ){
+				dmg *= 0.67f;
+			}
 			
-			int effectiveDamage = enemy.defenseProc( this, dmg );
+			int effectiveDamage = enemy.defenseProc( this, Math.round(dmg) );
 			effectiveDamage = Math.max( effectiveDamage - dr, 0 );
-			
+
+			//vulnerable specifically applies after armor reductions
 			if ( enemy.buff( Vulnerable.class ) != null){
 				effectiveDamage *= 1.33f;
 			}
@@ -380,7 +408,7 @@ public abstract class Char extends Actor {
 			if (buff(FireImbue.class) != null)  buff(FireImbue.class).proc(enemy);
 			if (buff(FrostImbue.class) != null) buff(FrostImbue.class).proc(enemy);
 
-			if (enemy.isAlive() && prep != null && prep.canKO(enemy)){
+			if (enemy.isAlive() && enemy.alignment != alignment && prep != null && prep.canKO(enemy)){
 				enemy.HP = 0;
 				if (!enemy.isAlive()) {
 					enemy.die(this);
@@ -402,6 +430,10 @@ public abstract class Char extends Actor {
 						return true;
 					}
 
+					if (this instanceof WandOfLivingEarth.EarthGuardian
+							|| this instanceof MirrorImage || this instanceof PrismaticImage){
+						Badges.validateDeathFromFriendlyMagic();
+					}
 					Dungeon.fail( getClass() );
 					GLog.n( Messages.capitalize(Messages.get(Char.class, "kill", name())) );
 					
@@ -413,11 +445,9 @@ public abstract class Char extends Actor {
 			return true;
 			
 		} else {
-			
-			if (visibleFight) {
-				String defense = enemy.defenseVerb();
-				enemy.sprite.showStatus( CharSprite.NEUTRAL, defense );
 
+			enemy.sprite.showStatus( CharSprite.NEUTRAL, enemy.defenseVerb() );
+			if (visibleFight) {
 				//TODO enemy.defenseSound? currently miss plays for monks/crab even when they parry
 				Sample.INSTANCE.play(Assets.Sounds.MISS);
 			}
@@ -452,6 +482,7 @@ public abstract class Char extends Actor {
 		for (ChampionEnemy buff : attacker.buffs(ChampionEnemy.class)){
 			acuRoll *= buff.evasionAndAccuracyFactor();
 		}
+		acuRoll *= AscensionChallenge.statModifier(attacker);
 		
 		float defRoll = Random.Float( defStat );
 		if (defender.buff(Bless.class) != null) defRoll *= 1.25f;
@@ -459,6 +490,7 @@ public abstract class Char extends Actor {
 		for (ChampionEnemy buff : defender.buffs(ChampionEnemy.class)){
 			defRoll *= buff.evasionAndAccuracyFactor();
 		}
+		defRoll *= AscensionChallenge.statModifier(defender);
 		
 		return (acuRoll * accMulti) >= defRoll;
 	}
@@ -487,11 +519,7 @@ public abstract class Char extends Actor {
 	// atm attack is always post-armor and defence is already pre-armor
 	
 	public int attackProc( Char enemy, int damage ) {
-		if ( buff(Weakness.class) != null ){
-			damage *= 0.67f;
-		}
 		for (ChampionEnemy buff : buffs(ChampionEnemy.class)){
-			damage *= buff.meleeDamageFactor();
 			buff.onAttackProc( enemy );
 		}
 		return damage;
@@ -507,6 +535,7 @@ public abstract class Char extends Actor {
 		if ( buff( Stamina.class ) != null) speed *= 1.5f;
 		if ( buff( Adrenaline.class ) != null) speed *= 2f;
 		if ( buff( Haste.class ) != null) speed *= 3f;
+		if ( buff( Dread.class ) != null) speed *= 2f;
 		return speed;
 	}
 	
@@ -541,6 +570,7 @@ public abstract class Char extends Actor {
 		for (ChampionEnemy buff : buffs(ChampionEnemy.class)){
 			dmg = (int) Math.ceil(dmg * buff.damageTakenFactor());
 		}
+		dmg = (int)Math.ceil(dmg / AscensionChallenge.statModifier(this));
 
 		if (!(src instanceof LifeLink) && buff(LifeLink.class) != null){
 			HashSet<LifeLink> links = buffs(LifeLink.class);
@@ -564,6 +594,10 @@ public abstract class Char extends Actor {
 		if (t != null){
 			t.recover();
 		}
+		Dread d = buff(Dread.class);
+		if (d != null){
+			d.recover();
+		}
 		Charm c = buff(Charm.class);
 		if (c != null){
 			c.recover(src);
@@ -579,11 +613,6 @@ public abstract class Char extends Actor {
 		}
 		if (alignment != Alignment.ALLY && this.buff(DeathMark.DeathMarkTracker.class) != null){
 			dmg *= 1.25f;
-		}
-		Endure.EndureTracker endure = buff(Endure.EndureTracker.class);
-		//reduce damage here if it isn't coming from a chacter (if it is we already reduced it)
-		if (endure != null && !(src instanceof Char)){
-			dmg = endure.adjustDamageTaken(dmg);
 		}
 		
 		Class<?> srcClass = src.getClass();
@@ -603,6 +632,7 @@ public abstract class Char extends Actor {
 			buff( Paralysis.class ).processDamage(dmg);
 		}
 
+		Endure.EndureTracker endure = buff(Endure.EndureTracker.class);
 		if (endure != null){
 			dmg = endure.enforceDamagetakenLimit(dmg);
 		}
@@ -641,6 +671,9 @@ public abstract class Char extends Actor {
 		for (Char ch : Actor.chars().toArray(new Char[0])){
 			if (ch.buff(Charm.class) != null && ch.buff(Charm.class).object == id()){
 				ch.buff(Charm.class).detach();
+			}
+			if (ch.buff(Dread.class) != null && ch.buff(Dread.class).object == id()){
+				ch.buff(Dread.class).detach();
 			}
 			if (ch.buff(Terror.class) != null && ch.buff(Terror.class).object == id()){
 				ch.buff(Terror.class).detach();
@@ -720,7 +753,15 @@ public abstract class Char extends Actor {
 	}
 
 	public synchronized void add( Buff buff ) {
-		
+
+		if (buff(PotionOfCleansing.Cleanse.class) != null) { //cleansing buff
+			if (buff.type == Buff.buffType.NEGATIVE
+					&& !(buff instanceof AllyBuff)
+					&& !(buff instanceof LostInventory)){
+				return;
+			}
+		}
+
 		buffs.add( buff );
 		if (Actor.chars().contains(this)) Actor.add( buff );
 
@@ -768,10 +809,15 @@ public abstract class Char extends Actor {
 	public float stealth() {
 		return 0;
 	}
-	
-	public void move( int step ) {
 
-		if (Dungeon.level.adjacent( step, pos ) && buff( Vertigo.class ) != null) {
+	public final void move( int step ) {
+		move( step, true );
+	}
+
+	//travelling may be false when a character is moving instantaneously, such as via teleportation
+	public void move( int step, boolean travelling ) {
+
+		if (travelling && Dungeon.level.adjacent( step, pos ) && buff( Vertigo.class ) != null) {
 			sprite.interruptMotion();
 			int newPos = pos + PathFinder.NEIGHBOURS8[Random.Int( 8 )];
 			if (!(Dungeon.level.passable[newPos] || Dungeon.level.avoid[newPos])
@@ -875,9 +921,9 @@ public abstract class Char extends Actor {
 
 	public enum Property{
 		BOSS ( new HashSet<Class>( Arrays.asList(Grim.class, GrimTrap.class, ScrollOfRetribution.class, ScrollOfPsionicBlast.class)),
-				new HashSet<Class>( Arrays.asList(Corruption.class) )),
+				new HashSet<Class>( Arrays.asList(AllyBuff.class, Dread.class) )),
 		MINIBOSS ( new HashSet<Class>(),
-				new HashSet<Class>( Arrays.asList(Corruption.class) )),
+				new HashSet<Class>( Arrays.asList(AllyBuff.class, Dread.class) )),
 		UNDEAD,
 		DEMONIC,
 		INORGANIC ( new HashSet<Class>(),

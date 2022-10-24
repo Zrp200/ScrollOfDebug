@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,6 +25,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
+import com.shatteredpixel.shatteredpixeldungeon.effects.SpellSprite;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.ui.ActionIndicator;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIcon;
@@ -55,7 +56,7 @@ public class Momentum extends Buff implements ActionIndicator.Action {
 			freerunCooldown--;
 		}
 
-		if (freerunCooldown == 0 && target.invisible > 0 && Dungeon.hero.pointsInTalent(Talent.SPEEDY_STEALTH) >= 1){
+		if (freerunCooldown == 0 && !freerunning() && target.invisible > 0 && Dungeon.hero.pointsInTalent(Talent.SPEEDY_STEALTH) >= 1){
 			momentumStacks = Math.min(momentumStacks + 2, 10);
 			movedLastTurn = true;
 		}
@@ -79,7 +80,7 @@ public class Momentum extends Buff implements ActionIndicator.Action {
 	
 	public void gainStack(){
 		movedLastTurn = true;
-		if (freerunCooldown <= 0){
+		if (freerunCooldown <= 0 && !freerunning()){
 			postpone(target.cooldown()+(1/target.speed()));
 			momentumStacks = Math.min(momentumStacks + 1, 10);
 			ActionIndicator.setAction(this);
@@ -136,6 +137,17 @@ public class Momentum extends Buff implements ActionIndicator.Action {
 	}
 
 	@Override
+	public String iconTextDisplay() {
+		if (freerunTurns > 0){
+			return Integer.toString(freerunTurns);
+		} else if (freerunCooldown > 0){
+			return Integer.toString(freerunCooldown);
+		} else {
+			return Integer.toString(momentumStacks);
+		}
+	}
+
+	@Override
 	public String toString() {
 		if (freerunTurns > 0){
 			return Messages.get(this, "running");
@@ -182,7 +194,12 @@ public class Momentum extends Buff implements ActionIndicator.Action {
 	}
 
 	@Override
-	public Image getIcon() {
+	public String actionName() {
+		return Messages.get(this, "action_name");
+	}
+
+	@Override
+	public Image actionIcon() {
 		Image im = new BuffIcon(BuffIndicator.HASTE, true);
 		im.hardlight(0x99992E);
 		return im;
@@ -195,6 +212,7 @@ public class Momentum extends Buff implements ActionIndicator.Action {
 		freerunCooldown = 10 + 4*momentumStacks;
 		Sample.INSTANCE.play(Assets.Sounds.MISS, 1f, 0.8f);
 		target.sprite.emitter().burst(Speck.factory(Speck.JET), 5+ momentumStacks);
+		SpellSprite.show(target, SpellSprite.HASTE, 1, 1, 0);
 		momentumStacks = 0;
 		BuffIndicator.refreshHero();
 		ActionIndicator.clearAction(this);

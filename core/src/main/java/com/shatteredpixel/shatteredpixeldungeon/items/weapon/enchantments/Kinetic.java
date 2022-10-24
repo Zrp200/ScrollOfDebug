@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,6 +58,10 @@ public class Kinetic extends Weapon.Enchantment {
 	}
 	
 	public static class ConservedDamage extends Buff {
+
+		{
+			type = buffType.POSITIVE;
+		}
 		
 		@Override
 		public int icon() {
@@ -73,6 +77,11 @@ public class Kinetic extends Weapon.Enchantment {
 			} else {
 				icon.hardlight(1f, 1f, 1f - preservedDamage*.2f);
 			}
+		}
+
+		@Override
+		public String iconTextDisplay() {
+			return Integer.toString(damageBonus());
 		}
 		
 		private float preservedDamage;

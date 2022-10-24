@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -24,12 +24,14 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.mobs;
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.Electricity;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Amok;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Dread;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Paralysis;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Sleep;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Terror;
@@ -73,16 +75,8 @@ public class Pylon extends Mob {
 
 	@Override
 	protected boolean act() {
-		spend(TICK);
-
-		Heap heap = Dungeon.level.heaps.get( pos );
-		if (heap != null) {
-			int n;
-			do {
-				n = pos + PathFinder.NEIGHBOURS8[Random.Int( 8 )];
-			} while (!Dungeon.level.passable[n] && !Dungeon.level.avoid[n]);
-			Dungeon.level.drop( heap.pickUp(), n ).sprite.drop( pos );
-		}
+		alerted = false;
+		super.act();
 
 		if (alignment == Alignment.NEUTRAL){
 			return true;
@@ -131,9 +125,13 @@ public class Pylon extends Mob {
 			ch.sprite.flash();
 			ch.damage(Random.NormalIntRange(10, 20), new Electricity());
 
-			if (ch == Dungeon.hero && !ch.isAlive()){
-				Dungeon.fail(DM300.class);
-				GLog.n( Messages.get(Electricity.class, "ondeath") );
+			if (ch == Dungeon.hero) {
+				Statistics.qualifiedForBossChallengeBadge = false;
+				Statistics.bossScores[2] -= 100;
+				if (!ch.isAlive()) {
+					Dungeon.fail(DM300.class);
+					GLog.n(Messages.get(Electricity.class, "ondeath"));
+				}
 			}
 		}
 	}
@@ -151,7 +149,7 @@ public class Pylon extends Mob {
 	}
 
 	@Override
-	public void notice() {
+	public void beckon(int cell) {
 		//do nothing
 	}
 
@@ -219,8 +217,8 @@ public class Pylon extends Mob {
 		immunities.add( Paralysis.class );
 		immunities.add( Amok.class );
 		immunities.add( Sleep.class );
-		immunities.add( ToxicGas.class );
 		immunities.add( Terror.class );
+		immunities.add( Dread.class );
 		immunities.add( Vertigo.class );
 	}
 

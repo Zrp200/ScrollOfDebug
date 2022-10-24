@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -126,7 +126,13 @@ public class Dart extends MissileWeapon {
 
 		return super.proc(attacker, defender, damage);
 	}
-	
+
+	@Override
+	public int throwPos(Hero user, int dst) {
+		updateCrossbow();
+		return super.throwPos(user, dst);
+	}
+
 	@Override
 	protected void onThrow(int cell) {
 		updateCrossbow();

@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -82,7 +82,7 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 	protected float shadowOffset    = 0.25f;
 
 	public enum State {
-		BURNING, LEVITATING, INVISIBLE, PARALYSED, FROZEN, ILLUMINATED, CHILLED, DARKENED, MARKED, HEALING, SHIELDED
+		BURNING, LEVITATING, INVISIBLE, PARALYSED, FROZEN, ILLUMINATED, CHILLED, DARKENED, MARKED, HEALING, SHIELDED, HEARTS
 	}
 	private int stunStates = 0;
 	
@@ -102,6 +102,7 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 	protected Emitter marked;
 	protected Emitter levitation;
 	protected Emitter healing;
+	protected Emitter hearts;
 	
 	protected IceBlock iceBlock;
 	protected DarkBlock darkBlock;
@@ -159,7 +160,15 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 
 		ch.updateSpriteState();
 	}
-	
+
+	@Override
+	public void destroy() {
+		super.destroy();
+		if (ch != null && ch.sprite == this){
+			ch.sprite = null;
+		}
+	}
+
 	//used for just updating a sprite based on a given character, not linking them or placing in the game
 	public void linkVisuals( Char ch ){
 		//do nothin by default
@@ -394,6 +403,10 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 			case SHIELDED:
 				GameScene.effect( shield = new ShieldHalo( this ));
 				break;
+			case HEARTS:
+				hearts = emitter();
+				hearts.pour(Speck.factory(Speck.HEART), 0.5f);
+				break;
 		}
 	}
 	
@@ -461,6 +474,12 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 					shield.putOut();
 				}
 				break;
+			case HEARTS:
+				if (hearts != null){
+					hearts.on = false;
+					hearts = null;
+				}
+				break;
 		}
 	}
 
@@ -513,6 +532,12 @@ public class CharSprite extends MovieClip implements Tweener.Listener, MovieClip
 		}
 		if (marked != null) {
 			marked.visible = visible;
+		}
+		if (healing != null){
+			healing.visible = visible;
+		}
+		if (hearts != null){
+			hearts.visible = visible;
 		}
 		if (aura != null){
 			if (aura.parent == null){

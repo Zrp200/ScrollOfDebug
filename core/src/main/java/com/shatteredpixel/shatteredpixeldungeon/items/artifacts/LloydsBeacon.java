@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -111,7 +111,7 @@ public class LloydsBeacon extends Artifact {
 
 		if (action == AC_SET || action == AC_RETURN) {
 			
-			if (Dungeon.bossLevel()) {
+			if (Dungeon.bossLevel() || !Dungeon.interfloorTeleportAllowed()) {
 				hero.spend( LloydsBeacon.TIME_TO_USE );
 				GLog.w( Messages.get(this, "preventing") );
 				return;
@@ -200,18 +200,18 @@ public class LloydsBeacon extends Artifact {
 			if (target == null) return;
 
 			Invisibility.dispel();
-			charge -= Dungeon.depth > 20 ? 2 : 1;
+			charge -= Dungeon.scalingDepth() > 20 ? 2 : 1;
 			updateQuickslot();
 
 			if (Actor.findChar(target) == curUser){
-				ScrollOfTeleportation.teleportHero(curUser);
+				ScrollOfTeleportation.teleportChar(curUser);
 				curUser.spendAndNext(1f);
 			} else {
 				final Ballistica bolt = new Ballistica( curUser.pos, target, Ballistica.MAGIC_BOLT );
 				final Char ch = Actor.findChar(bolt.collisionPos);
 
 				if (ch == curUser){
-					ScrollOfTeleportation.teleportHero(curUser);
+					ScrollOfTeleportation.teleportChar(curUser);
 					curUser.spendAndNext( 1f );
 				} else {
 					Sample.INSTANCE.play( Assets.Sounds.ZAP );

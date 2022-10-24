@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -60,7 +60,7 @@ public class WndInfoMob extends WndTitledMessage {
 			health.level(mob);
 			add( health );
 
-			buffs = new BuffIndicator( mob );
+			buffs = new BuffIndicator( mob, false );
 			add( buffs );
 		}
 		
@@ -70,16 +70,17 @@ public class WndInfoMob extends WndTitledMessage {
 			image.x = 0;
 			image.y = Math.max( 0, name.height() + health.height() - image.height() );
 
+			float w = width - image.width() - GAP;
+
+			name.maxWidth((int)w);
 			name.setPos(x + image.width + GAP,
 					image.height() > name.height() ? y +(image.height() - name.height()) / 2 : y);
-
-			float w = width - image.width() - GAP;
 
 			health.setRect(image.width() + GAP, name.bottom() + GAP, w, health.height());
 
 			buffs.setPos(
 				name.right() + GAP-1,
-				name.bottom() - BuffIndicator.SIZE-2
+				name.bottom() - BuffIndicator.SIZE_SMALL-2
 			);
 
 			height = health.bottom();

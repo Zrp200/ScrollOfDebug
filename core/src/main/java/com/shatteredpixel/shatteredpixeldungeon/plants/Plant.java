@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,8 +50,6 @@ import com.watabou.utils.Reflection;
 import java.util.ArrayList;
 
 public abstract class Plant implements Bundlable {
-
-	public String plantName = Messages.get(this, "name");
 	
 	public int image;
 	public int pos;
@@ -113,7 +111,11 @@ public abstract class Plant implements Bundlable {
 	public void storeInBundle( Bundle bundle ) {
 		bundle.put( POS, pos );
 	}
-	
+
+	public String name(){
+		return Messages.get(this, "name");
+	}
+
 	public String desc() {
 		String desc = Messages.get(this, "desc");
 		if (Dungeon.hero.subClass == HeroSubClass.WARDEN){
@@ -203,6 +205,11 @@ public abstract class Plant implements Bundlable {
 		@Override
 		public int value() {
 			return 10 * quantity;
+		}
+
+		@Override
+		public int energyVal() {
+			return 2 * quantity;
 		}
 
 		@Override

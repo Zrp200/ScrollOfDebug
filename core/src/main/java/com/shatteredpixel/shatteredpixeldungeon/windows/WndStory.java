@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -87,13 +87,15 @@ public class WndStory extends Window {
 		tf.invert();
 		tf.setPos(MARGIN, y);
 		add( tf );
-		
-		add( new PointerArea( chrome ) {
+
+		PointerArea blocker = new PointerArea( 0, 0, PixelScene.uiCamera.width, PixelScene.uiCamera.height ) {
 			@Override
 			protected void onClick( PointerEvent event ) {
-				hide();
+				onBackPressed();
 			}
-		} );
+		};
+		blocker.camera = PixelScene.uiCamera;
+		add(blocker);
 		
 		resize( (int)(tf.width() + MARGIN * 2), (int)Math.min( tf.bottom()+MARGIN, 180 ) );
 	}

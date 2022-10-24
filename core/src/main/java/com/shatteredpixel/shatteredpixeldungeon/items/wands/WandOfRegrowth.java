@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,14 +23,23 @@ package com.shatteredpixel.shatteredpixeldungeon.items.wands;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Amok;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Doom;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Dread;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Paralysis;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Roots;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Sleep;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Terror;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Vertigo;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.abilities.mage.WildMagic;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.DwarfKing;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile;
 import com.shatteredpixel.shatteredpixeldungeon.items.Dewdrop;
@@ -113,6 +122,9 @@ public class WandOfRegrowth extends Wand {
 				}
 				Char ch = Actor.findChar(cell);
 				if (ch != null){
+					if (ch instanceof DwarfKing){
+						Statistics.qualifiedForBossChallengeBadge = false;
+					}
 					wandProc(ch, chargesPerCast());
 					Buff.prolong( ch, Roots.class, 4f * chrgUsed );
 				}
@@ -202,7 +214,7 @@ public class WandOfRegrowth extends Wand {
 		} else {
 			//8 charges at base, plus:
 			//2/3.33/5/7/10/14/20/30/50/110/infinite charges per hero level, based on wand level
-			float lvl = buffedLvl();
+			float lvl = level();
 			return Math.round(8 + heroLvl * (2+lvl) * (1f + (lvl/(10 - lvl))));
 		}
 	}
@@ -324,8 +336,8 @@ public class WandOfRegrowth extends Wand {
 			ArrayList<Integer> candidates = new ArrayList<>();
 			for (int i : PathFinder.NEIGHBOURS8){
 				if (Dungeon.level.passable[pos+i]
-						&& pos+i != Dungeon.level.entrance
-						&& pos+i != Dungeon.level.exit){
+						&& pos+i != Dungeon.level.entrance()
+						&& pos+i != Dungeon.level.exit()){
 					candidates.add(pos+i);
 				}
 			}
@@ -364,15 +376,15 @@ public class WandOfRegrowth extends Wand {
 			ArrayList<Integer> candidates = new ArrayList<>();
 			for (int i : PathFinder.NEIGHBOURS8){
 				if (Dungeon.level.passable[pos+i]
-						&& pos+i != Dungeon.level.entrance
-						&& pos+i != Dungeon.level.exit){
+						&& pos+i != Dungeon.level.entrance()
+						&& pos+i != Dungeon.level.exit()){
 					candidates.add(pos+i);
 				}
 			}
 
 			for (int i = 0; i < nSeeds && !candidates.isEmpty(); i++){
 				Integer c = Random.element(candidates);
-				Dungeon.level.drop(Generator.random(Generator.Category.SEED), c).sprite.drop(pos);
+				Dungeon.level.drop(Generator.randomUsingDefaults(Generator.Category.SEED), c).sprite.drop(pos);
 				candidates.remove(c);
 			}
 
@@ -390,7 +402,7 @@ public class WandOfRegrowth extends Wand {
 	public static class Lotus extends NPC {
 
 		{
-			alignment = Alignment.ALLY;
+			alignment = Alignment.NEUTRAL;
 			properties.add(Property.IMMOVABLE);
 
 			spriteClass = LotusSprite.class;
@@ -451,8 +463,14 @@ public class WandOfRegrowth extends Wand {
 		}
 
 		{
-			immunities.add(Corruption.class);
-			immunities.add(Doom.class);
+			immunities.add( Paralysis.class );
+			immunities.add( Amok.class );
+			immunities.add( Sleep.class );
+			immunities.add( Terror.class );
+			immunities.add( Dread.class );
+			immunities.add( Vertigo.class );
+			immunities.add( AllyBuff.class );
+			immunities.add( Doom.class );
 		}
 
 		@Override

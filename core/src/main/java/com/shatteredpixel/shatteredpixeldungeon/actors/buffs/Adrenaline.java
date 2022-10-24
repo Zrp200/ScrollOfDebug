@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@ package com.shatteredpixel.shatteredpixeldungeon.actors.buffs;
 
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.ui.BuffIndicator;
+import com.watabou.noosa.Image;
 
 public class Adrenaline extends FlavourBuff {
 	
@@ -36,7 +37,12 @@ public class Adrenaline extends FlavourBuff {
 	
 	@Override
 	public int icon() {
-		return BuffIndicator.AMOK;
+		return BuffIndicator.UPGRADE;
+	}
+
+	@Override
+	public void tintIcon(Image icon) {
+		icon.hardlight(1, 0, 0);
 	}
 
 	@Override

@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,7 @@ import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.ArtifactRecharge;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.CounterBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.EnhancedRings;
@@ -160,6 +161,43 @@ public enum Talent {
 	public static class StrikingWaveTracker extends FlavourBuff{};
 	public static class WandPreservationCounter extends CounterBuff{{revivePersists = true;}};
 	public static class EmpoweredStrikeTracker extends FlavourBuff{};
+	public static class ProtectiveShadowsTracker extends Buff {
+		float barrierInc = 0.5f;
+
+		@Override
+		public boolean act() {
+			//barrier every 2/1 turns, to a max of 3/5
+			if (((Hero)target).hasTalent(Talent.PROTECTIVE_SHADOWS) && target.invisible > 0){
+				Barrier barrier = Buff.affect(target, Barrier.class);
+				if (barrier.shielding() < 1 + 2*((Hero)target).pointsInTalent(Talent.PROTECTIVE_SHADOWS)) {
+					barrierInc += 0.5f * ((Hero) target).pointsInTalent(Talent.PROTECTIVE_SHADOWS);
+				}
+				if (barrierInc >= 1){
+					barrierInc = 0;
+					barrier.incShield(1);
+				} else {
+					barrier.incShield(0); //resets barrier decay
+				}
+			} else {
+				detach();
+			}
+			spend( TICK );
+			return true;
+		}
+
+		private static final String BARRIER_INC = "barrier_inc";
+		@Override
+		public void storeInBundle(Bundle bundle) {
+			super.storeInBundle(bundle);
+			bundle.put( BARRIER_INC, barrierInc);
+		}
+
+		@Override
+		public void restoreFromBundle(Bundle bundle) {
+			super.restoreFromBundle(bundle);
+			barrierInc = bundle.getFloat( BARRIER_INC );
+		}
+	}
 	public static class BountyHunterTracker extends FlavourBuff{};
 	public static class RejuvenatingStepsCooldown extends FlavourBuff{
 		public int icon() { return BuffIndicator.TIME; }
@@ -195,7 +233,7 @@ public enum Talent {
 
 	public int icon(){
 		if (this == HEROIC_ENERGY){
-			if (Dungeon.hero != null && Dungeon.hero.armorAbility instanceof Ratmogrify){
+			if (Ratmogrify.useRatroicEnergy){
 				return 127;
 			}
 			HeroClass cls = Dungeon.hero != null ? Dungeon.hero.heroClass : GamesInProgress.selectedClass;
@@ -219,24 +257,30 @@ public enum Talent {
 	}
 
 	public String title(){
-		//TODO translate this
-		if (this == HEROIC_ENERGY &&
-				Messages.lang() == Languages.ENGLISH
-				&& Dungeon.hero != null
-				&& Dungeon.hero.armorAbility instanceof Ratmogrify){
-			return "ratroic energy";
+		if (this == HEROIC_ENERGY && Ratmogrify.useRatroicEnergy){
+			return Messages.get(this, name() + ".rat_title");
 		}
 		return Messages.get(this, name() + ".title");
 	}
 
-	public String desc(){
+	public final String desc(){
+		return desc(false);
+	}
+
+	public String desc(boolean metamorphed){
+		if (metamorphed){
+			String metaDesc = Messages.get(this, name() + ".meta_desc");
+			if (!metaDesc.equals(Messages.NO_TEXT_FOUND)){
+				return Messages.get(this, name() + ".desc") + "\n\n" + metaDesc;
+			}
+		}
 		return Messages.get(this, name() + ".desc");
 	}
 
-	public static void onTalentUpgraded( Hero hero, Talent talent){
-		if (talent == NATURES_BOUNTY){
-			if ( hero.pointsInTalent(NATURES_BOUNTY) == 1) Buff.count(hero, NatureBerriesAvailable.class, 4);
-			else                                           Buff.count(hero, NatureBerriesAvailable.class, 2);
+	public static void onTalentUpgraded( Hero hero, Talent talent ){
+		//for metamorphosis
+		if (talent == IRON_WILL && hero.heroClass != HeroClass.WARRIOR){
+			Buff.affect(hero, BrokenSeal.WarriorShield.class);
 		}
 
 		if (talent == ARMSMASTERS_INTUITION && hero.pointsInTalent(ARMSMASTERS_INTUITION) == 2){
@@ -257,7 +301,7 @@ public enum Talent {
 			if (hero.belongings.misc instanceof Ring) ((Ring) hero.belongings.misc).setKnown();
 		}
 
-		if (talent == LIGHT_CLOAK && hero.pointsInTalent(LIGHT_CLOAK) == 1){
+		if (talent == LIGHT_CLOAK && hero.heroClass == HeroClass.ROGUE){
 			for (Item item : Dungeon.hero.belongings.backpack){
 				if (item instanceof CloakOfShadows){
 					if (hero.buff(LostInventory.class) == null || item.keptThoughLostInvent) {
@@ -273,7 +317,8 @@ public enum Talent {
 	}
 
 	public static class CachedRationsDropped extends CounterBuff{{revivePersists = true;}};
-	public static class NatureBerriesAvailable extends CounterBuff{{revivePersists = true;}};
+	public static class NatureBerriesAvailable extends CounterBuff{{revivePersists = true;}}; //for pre-1.3.0 saves
+	public static class NatureBerriesDropped extends CounterBuff{{revivePersists = true;}};
 
 	public static void onFoodEaten( Hero hero, float foodVal, Item foodSource ){
 		if (hero.hasTalent(HEARTY_MEAL)){
@@ -301,11 +346,16 @@ public enum Talent {
 			//5/8 turns of recharging
 			Buff.prolong( hero, Recharging.class, 2 + 3*(hero.pointsInTalent(ENERGIZING_MEAL)) );
 			ScrollOfRecharging.charge( hero );
+			SpellSprite.show(hero, SpellSprite.CHARGE);
 		}
 		if (hero.hasTalent(MYSTICAL_MEAL)){
 			//3/5 turns of recharging
-			Buff.affect( hero, ArtifactRecharge.class).set(1 + 2*(hero.pointsInTalent(MYSTICAL_MEAL))).ignoreHornOfPlenty = foodSource instanceof HornOfPlenty;
+			ArtifactRecharge buff = Buff.affect( hero, ArtifactRecharge.class);
+			if (buff.left() < 1 + 2*(hero.pointsInTalent(MYSTICAL_MEAL))){
+				Buff.affect( hero, ArtifactRecharge.class).set(1 + 2*(hero.pointsInTalent(MYSTICAL_MEAL))).ignoreHornOfPlenty = foodSource instanceof HornOfPlenty;
+			}
 			ScrollOfRecharging.charge( hero );
+			SpellSprite.show(hero, SpellSprite.CHARGE, 0, 1, 1);
 		}
 		if (hero.hasTalent(INVIGORATING_MEAL)){
 			//effectively 1/2 turns of haste
@@ -338,10 +388,15 @@ public enum Talent {
 
 	public static void onHealingPotionUsed( Hero hero ){
 		if (hero.hasTalent(RESTORED_WILLPOWER)){
-			BrokenSeal.WarriorShield shield = hero.buff(BrokenSeal.WarriorShield.class);
-			if (shield != null){
-				int shieldToGive = Math.round(shield.maxShield() * 0.33f*(1+hero.pointsInTalent(RESTORED_WILLPOWER)));
-				shield.supercharge(shieldToGive);
+			if (hero.heroClass == HeroClass.WARRIOR) {
+				BrokenSeal.WarriorShield shield = hero.buff(BrokenSeal.WarriorShield.class);
+				if (shield != null) {
+					int shieldToGive = Math.round(shield.maxShield() * 0.33f * (1 + hero.pointsInTalent(RESTORED_WILLPOWER)));
+					shield.supercharge(shieldToGive);
+				}
+			} else {
+				int shieldToGive = Math.round( hero.HT * (0.025f * (1+hero.pointsInTalent(RESTORED_WILLPOWER))));
+				Buff.affect(hero, Barrier.class).setShield(shieldToGive);
 			}
 		}
 		if (hero.hasTalent(RESTORED_NATURE)){
@@ -383,19 +438,29 @@ public enum Talent {
 
 	public static void onUpgradeScrollUsed( Hero hero ){
 		if (hero.hasTalent(ENERGIZING_UPGRADE)){
-			MagesStaff staff = hero.belongings.getItem(MagesStaff.class);
-			if (staff != null){
-				staff.gainCharge(1 + 2*hero.pointsInTalent(ENERGIZING_UPGRADE), true);
-				ScrollOfRecharging.charge( Dungeon.hero );
-				SpellSprite.show( hero, SpellSprite.CHARGE );
+			if (hero.heroClass == HeroClass.MAGE) {
+				MagesStaff staff = hero.belongings.getItem(MagesStaff.class);
+				if (staff != null) {
+					staff.gainCharge(2 + 2 * hero.pointsInTalent(ENERGIZING_UPGRADE), true);
+					ScrollOfRecharging.charge(Dungeon.hero);
+					SpellSprite.show(hero, SpellSprite.CHARGE);
+				}
+			} else {
+				Buff.affect(hero, Recharging.class, 4 + 8 * hero.pointsInTalent(ENERGIZING_UPGRADE));
 			}
 		}
 		if (hero.hasTalent(MYSTICAL_UPGRADE)){
-			CloakOfShadows cloak = hero.belongings.getItem(CloakOfShadows.class);
-			if (cloak != null){
-				cloak.overCharge(1 + hero.pointsInTalent(MYSTICAL_UPGRADE));
-				ScrollOfRecharging.charge( Dungeon.hero );
-				SpellSprite.show( hero, SpellSprite.CHARGE );
+			if (hero.heroClass == HeroClass.ROGUE) {
+				CloakOfShadows cloak = hero.belongings.getItem(CloakOfShadows.class);
+				if (cloak != null) {
+					cloak.overCharge(1 + hero.pointsInTalent(MYSTICAL_UPGRADE));
+					ScrollOfRecharging.charge(Dungeon.hero);
+					SpellSprite.show(hero, SpellSprite.CHARGE, 0, 1, 1);
+				}
+			} else {
+				Buff.affect(hero, ArtifactRecharge.class).set( 2 + 4*hero.pointsInTalent(MYSTICAL_UPGRADE) ).ignoreHornOfPlenty = false;
+				ScrollOfRecharging.charge(Dungeon.hero);
+				SpellSprite.show(hero, SpellSprite.CHARGE, 0, 1, 1);
 			}
 		}
 	}
@@ -430,8 +495,10 @@ public enum Talent {
 		if (hero.hasTalent(TEST_SUBJECT)){
 			//heal for 2/3 HP
 			hero.HP = Math.min(hero.HP + 1 + hero.pointsInTalent(TEST_SUBJECT), hero.HT);
-			Emitter e = hero.sprite.emitter();
-			if (e != null) e.burst(Speck.factory(Speck.HEALING), hero.pointsInTalent(TEST_SUBJECT));
+			if (hero.sprite != null) {
+				Emitter e = hero.sprite.emitter();
+				if (e != null) e.burst(Speck.factory(Speck.HEALING), hero.pointsInTalent(TEST_SUBJECT));
+			}
 		}
 		if (hero.hasTalent(TESTED_HYPOTHESIS)){
 			//2/3 turns of wand recharging
@@ -469,10 +536,14 @@ public enum Talent {
 	public static final int MAX_TALENT_TIERS = 4;
 
 	public static void initClassTalents( Hero hero ){
-		initClassTalents( hero.heroClass, hero.talents );
+		initClassTalents( hero.heroClass, hero.talents, hero.metamorphedTalents );
 	}
 
-	public static void initClassTalents( HeroClass cls, ArrayList<LinkedHashMap<Talent, Integer>> talents ){
+	public static void initClassTalents( HeroClass cls, ArrayList<LinkedHashMap<Talent, Integer>> talents){
+		initClassTalents( cls, talents, new LinkedHashMap<>());
+	}
+
+	public static void initClassTalents( HeroClass cls, ArrayList<LinkedHashMap<Talent, Integer>> talents, LinkedHashMap<Talent, Talent> replacements ){
 		while (talents.size() < MAX_TALENT_TIERS){
 			talents.add(new LinkedHashMap<>());
 		}
@@ -495,6 +566,9 @@ public enum Talent {
 				break;
 		}
 		for (Talent talent : tierTalents){
+			if (replacements.containsKey(talent)){
+				talent = replacements.get(talent);
+			}
 			talents.get(0).put(talent, 0);
 		}
 		tierTalents.clear();
@@ -515,6 +589,9 @@ public enum Talent {
 				break;
 		}
 		for (Talent talent : tierTalents){
+			if (replacements.containsKey(talent)){
+				talent = replacements.get(talent);
+			}
 			talents.get(1).put(talent, 0);
 		}
 		tierTalents.clear();
@@ -535,6 +612,9 @@ public enum Talent {
 				break;
 		}
 		for (Talent talent : tierTalents){
+			if (replacements.containsKey(talent)){
+				talent = replacements.get(talent);
+			}
 			talents.get(2).put(talent, 0);
 		}
 		tierTalents.clear();
@@ -623,9 +703,23 @@ public enum Talent {
 			}
 			bundle.put(TALENT_TIER+(i+1), tierBundle);
 		}
+
+		Bundle replacementsBundle = new Bundle();
+		for (Talent t : hero.metamorphedTalents.keySet()){
+			replacementsBundle.put(t.name(), hero.metamorphedTalents.get(t));
+		}
+		bundle.put("replacements", replacementsBundle);
 	}
 
 	public static void restoreTalentsFromBundle( Bundle bundle, Hero hero ){
+		//TODO restore replacements
+		if (bundle.contains("replacements")){
+			Bundle replacements = bundle.getBundle("replacements");
+			for (String key : replacements.getKeys()){
+				hero.metamorphedTalents.put(Talent.valueOf(key), replacements.getEnum(key, Talent.class));
+			}
+		}
+
 		if (hero.heroClass != null)     initClassTalents(hero);
 		if (hero.subClass != null)      initSubclassTalents(hero);
 		if (hero.armorAbility != null)  initArmorTalents(hero);
@@ -633,10 +727,6 @@ public enum Talent {
 		for (int i = 0; i < MAX_TALENT_TIERS; i++){
 			LinkedHashMap<Talent, Integer> tier = hero.talents.get(i);
 			Bundle tierBundle = bundle.contains(TALENT_TIER+(i+1)) ? bundle.getBundle(TALENT_TIER+(i+1)) : null;
-			//pre-0.9.1 saves
-			if (tierBundle == null && i == 0 && bundle.contains("talents")){
-				tierBundle = bundle.getBundle("talents");
-			}
 
 			if (tierBundle != null){
 				for (Talent talent : tier.keySet()){

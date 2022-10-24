@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,11 +25,12 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
-import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.MagicImmune;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Momentum;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.PinCushion;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.RevealedArea;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroClass;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
@@ -61,7 +62,7 @@ abstract public class MissileWeapon extends Weapon {
 	
 	protected boolean sticky = true;
 	
-	protected static final float MAX_DURABILITY = 100;
+	public static final float MAX_DURABILITY = 100;
 	protected float durability = MAX_DURABILITY;
 	protected float baseUses = 10;
 	
@@ -188,8 +189,21 @@ abstract public class MissileWeapon extends Weapon {
 	protected void onThrow( int cell ) {
 		Char enemy = Actor.findChar( cell );
 		if (enemy == null || enemy == curUser) {
-				parent = null;
-				super.onThrow( cell );
+			parent = null;
+
+			//metamorphed seer shot logic
+			if (curUser.hasTalent(Talent.SEER_SHOT)
+					&& curUser.heroClass != HeroClass.HUNTRESS
+					&& curUser.buff(Talent.SeerShotCooldown.class) == null){
+				if (Actor.findChar(cell) == null) {
+					RevealedArea a = Buff.affect(curUser, RevealedArea.class, 5 * curUser.pointsInTalent(Talent.SEER_SHOT));
+					a.depth = Dungeon.depth;
+					a.pos = cell;
+					Buff.affect(curUser, Talent.SeerShotCooldown.class, 20f);
+				}
+			}
+
+			super.onThrow( cell );
 		} else {
 			if (!curUser.shoot( enemy, this )) {
 				rangedMiss( cell );
@@ -243,7 +257,7 @@ abstract public class MissileWeapon extends Weapon {
 		decrementDurability();
 		if (durability > 0){
 			//attempt to stick the missile weapon to the enemy, just drop it if we can't.
-			if (sticky && enemy != null && enemy.isAlive() && enemy.buff(Corruption.class) == null){
+			if (sticky && enemy != null && enemy.isAlive() && enemy.alignment != Char.Alignment.ALLY){
 				PinCushion p = Buff.affect(enemy, PinCushion.class);
 				if (p.target == enemy){
 					p.stick(this);
@@ -265,9 +279,10 @@ abstract public class MissileWeapon extends Weapon {
 
 	public void repair( float amount ){
 		durability += amount;
+		durability = Math.min(durability, MAX_DURABILITY);
 	}
 	
-	protected float durabilityPerUse(){
+	public float durabilityPerUse(){
 		float usages = baseUses * (float)(Math.pow(3, level()));
 
 		//+50%/75% durability
@@ -368,9 +383,9 @@ abstract public class MissileWeapon extends Weapon {
 	}
 	
 	@Override
-	public boolean doPickUp(Hero hero) {
+	public boolean doPickUp(Hero hero, int pos) {
 		parent = null;
-		return super.doPickUp(hero);
+		return super.doPickUp(hero, pos);
 	}
 	
 	@Override
@@ -444,7 +459,7 @@ abstract public class MissileWeapon extends Weapon {
 		bundleRestoring = true;
 		super.restoreFromBundle(bundle);
 		bundleRestoring = false;
-		durability = bundle.getInt(DURABILITY);
+		durability = bundle.getFloat(DURABILITY);
 	}
 
 	public static class PlaceHolder extends MissileWeapon {
