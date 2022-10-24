@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -100,8 +100,8 @@ public class AboutScene extends PixelScene {
 
 		CreditsBlock charlie = new CreditsBlock(false, Window.SHPX_COLOR,
 				"Sound Effects:",
-				Icons.CHARLIE.get(),
-				"Charlie",
+				Icons.CELESTI.get(),
+				"Celesti",
 				"s9menine.itch.io",
 				"https://s9menine.itch.io");
 		charlie.setRect(alex.right(), alex.top(), colWidth/2f, 0);
@@ -315,7 +315,7 @@ public class AboutScene extends PixelScene {
 				linkButton = new PointerArea(0, 0, 0, 0){
 					@Override
 					protected void onClick( PointerEvent event ) {
-						DeviceCompat.openURI( linkUrl );
+						ShatteredPixelDungeon.platform.openURI( linkUrl );
 					}
 				};
 				add(linkButton);

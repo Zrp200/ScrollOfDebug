@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,6 +43,11 @@ public class MetalShard extends Item {
 	
 	@Override
 	public int value() {
-		return quantity * 100;
+		return quantity * 50;
+	}
+
+	@Override
+	public int energyVal() {
+		return quantity * 3;
 	}
 }

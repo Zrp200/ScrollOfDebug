@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.rings.Ring;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfRemoveCurse;
 import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.Random;
 
@@ -46,6 +47,9 @@ public class Belongings implements Iterable<Item> {
 	private Hero owner;
 
 	public static class Backpack extends Bag {
+		{
+			image = ItemSpriteSheet.BACKPACK;
+		}
 		public int capacity(){
 			int cap = super.capacity();
 			for (Item item : items){
@@ -152,46 +156,19 @@ public class Belongings implements Iterable<Item> {
 		backpack.restoreFromBundle( bundle );
 		
 		weapon = (KindOfWeapon) bundle.get(WEAPON);
-		if (weapon != null) {
-			weapon.activate(owner);
-		}
+		if (weapon() != null)       weapon().activate(owner);
 		
 		armor = (Armor)bundle.get( ARMOR );
-		if (armor != null){
-			armor.activate( owner );
-		}
+		if (armor() != null)        armor().activate( owner );
 
-		//pre-0.8.2
-		if (bundle.contains("misc1") || bundle.contains("misc2")){
-			artifact = null;
-			misc = null;
-			ring = null;
+		artifact = (Artifact) bundle.get(ARTIFACT);
+		if (artifact() != null)     artifact().activate(owner);
 
-			KindofMisc m = (KindofMisc)bundle.get("misc1");
-			if (m instanceof Artifact){
-				artifact = (Artifact) m;
-			} else if (m instanceof Ring) {
-				ring = (Ring) m;
-			}
+		misc = (KindofMisc) bundle.get(MISC);
+		if (misc() != null)         misc().activate( owner );
 
-			m = (KindofMisc)bundle.get("misc2");
-			if (m instanceof Artifact){
-				if (artifact == null)   artifact = (Artifact) m;
-				else                    misc = (Artifact) m;
-			} else if (m instanceof Ring) {
-				if (ring == null)       ring = (Ring) m;
-				else                    misc = (Ring) m;
-			}
-
-		} else {
-			artifact = (Artifact) bundle.get(ARTIFACT);
-			misc = (KindofMisc) bundle.get(MISC);
-			ring = (Ring) bundle.get(RING);
-		}
-
-		if (artifact != null)   artifact.activate(owner);
-		if (misc != null)       misc.activate( owner );
-		if (ring != null)       ring.activate( owner );
+		ring = (Ring) bundle.get(RING);
+		if (ring() != null)         ring().activate( owner );
 	}
 	
 	public static void preview( GamesInProgress.Info info, Bundle bundle ) {
@@ -333,6 +310,7 @@ public class Belongings implements Iterable<Item> {
 				item.cursedKnown = true;
 			}
 		}
+		Item.updateQuickslot();
 	}
 	
 	public void uncurseEquipped() {

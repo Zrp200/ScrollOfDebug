@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -156,11 +156,11 @@ public enum Document {
 		ALCHEMY_GUIDE.pagesStates.put("Potions",              debug ? READ : NOT_FOUND);
 		ALCHEMY_GUIDE.pagesStates.put("Stones",               debug ? READ : NOT_FOUND);
 		ALCHEMY_GUIDE.pagesStates.put("Energy_Food",          debug ? READ : NOT_FOUND);
+		ALCHEMY_GUIDE.pagesStates.put("Exotic_Potions",       debug ? READ : NOT_FOUND);
+		ALCHEMY_GUIDE.pagesStates.put("Exotic_Scrolls",       debug ? READ : NOT_FOUND);
+		//given in prison
 		ALCHEMY_GUIDE.pagesStates.put("Bombs",                debug ? READ : NOT_FOUND);
 		ALCHEMY_GUIDE.pagesStates.put("Weapons",              debug ? READ : NOT_FOUND);
-		//given in prison
-		ALCHEMY_GUIDE.pagesStates.put("Exotic_Potions",       debug? READ : NOT_FOUND);
-		ALCHEMY_GUIDE.pagesStates.put("Exotic_Scrolls",       debug ? READ : NOT_FOUND);
 		ALCHEMY_GUIDE.pagesStates.put("Catalysts",            debug ? READ : NOT_FOUND);
 		ALCHEMY_GUIDE.pagesStates.put("Brews_Elixirs",        debug ? READ : NOT_FOUND);
 		ALCHEMY_GUIDE.pagesStates.put("Spells",               debug ? READ : NOT_FOUND);

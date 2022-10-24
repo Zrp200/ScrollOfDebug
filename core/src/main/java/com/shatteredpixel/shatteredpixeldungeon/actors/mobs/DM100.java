@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,8 +21,10 @@
 
 package com.shatteredpixel.shatteredpixeldungeon.actors.mobs;
 
+import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.effects.particles.SparkParticle;
 import com.shatteredpixel.shatteredpixeldungeon.items.Generator;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
@@ -90,6 +92,7 @@ public class DM100 extends Mob implements Callback {
 			
 			if (hit( this, enemy, true )) {
 				int dmg = Random.NormalIntRange(3, 10);
+				dmg = Math.round(dmg * AscensionChallenge.statModifier(this));
 				enemy.damage( dmg, new LightningBolt() );
 
 				if (enemy.sprite.visible) {
@@ -102,6 +105,7 @@ public class DM100 extends Mob implements Callback {
 					Camera.main.shake( 2, 0.3f );
 					
 					if (!enemy.isAlive()) {
+						Badges.validateDeathFromEnemyMagic();
 						Dungeon.fail( getClass() );
 						GLog.n( Messages.get(this, "zap_kill") );
 					}

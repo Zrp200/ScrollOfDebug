@@ -1,3 +1,24 @@
+/*
+ * Pixel Dungeon
+ * Copyright (C) 2012-2015 Oleg Dolya
+ *
+ * Shattered Pixel Dungeon
+ * Copyright (C) 2014-2022 Evan Debenham
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
 package com.shatteredpixel.shatteredpixeldungeon.items;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
@@ -9,6 +30,7 @@ import com.shatteredpixel.shatteredpixeldungeon.items.bags.Bag;
 import com.shatteredpixel.shatteredpixeldungeon.items.bags.MagicalHolster;
 import com.shatteredpixel.shatteredpixeldungeon.items.potions.Potion;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.MissileWeapon;
+import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.Dart;
 import com.shatteredpixel.shatteredpixeldungeon.items.weapon.missiles.darts.TippedDart;
 import com.shatteredpixel.shatteredpixeldungeon.levels.Terrain;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -103,7 +125,7 @@ public class LiquidMetal extends Item {
 
 		@Override
 		public boolean itemSelectable(Item item) {
-			return item instanceof MissileWeapon && !(item instanceof TippedDart);
+			return item instanceof MissileWeapon && !(item instanceof Dart);
 		}
 
 		@Override
@@ -114,27 +136,30 @@ public class LiquidMetal extends Item {
 				int maxToUse = 5*(m.tier+1);
 				maxToUse *= Math.pow(2, m.level());
 
-				float durabilityPerUse = 100 / (float)maxToUse;
+				float durabilityPerMetal = 100 / (float)maxToUse;
 
 				//we remove a tiny amount here to account for rounding errors
-				float percentDurabilityLeft = 0.999f - (m.durabilityLeft()/100f);
-				maxToUse = (int)Math.ceil(maxToUse*percentDurabilityLeft);
-				if (maxToUse == 0){
+				float percentDurabilityLost = 0.999f - (m.durabilityLeft()/100f);
+				maxToUse = (int)Math.ceil(maxToUse*percentDurabilityLost);
+				float durPerUse = m.durabilityPerUse()/100f;
+				if (maxToUse == 0 ||
+						Math.ceil(m.durabilityLeft()/ m.durabilityPerUse()) >= Math.ceil(m.MAX_DURABILITY/ m.durabilityPerUse()) ){
 					GLog.w(Messages.get(LiquidMetal.class, "already_fixed"));
 					return;
 				} else if (maxToUse < quantity()) {
-					m.repair(maxToUse*durabilityPerUse);
+					m.repair(maxToUse*durabilityPerMetal);
 					quantity(quantity()-maxToUse);
 					GLog.i(Messages.get(LiquidMetal.class, "apply", maxToUse));
 
 				} else {
-					m.repair(quantity()*durabilityPerUse);
+					m.repair(quantity()*durabilityPerMetal);
 					GLog.i(Messages.get(LiquidMetal.class, "apply", quantity()));
 					detachAll(Dungeon.hero.belongings.backpack);
 				}
 
 				curUser.sprite.operate(curUser.pos);
 				Sample.INSTANCE.play(Assets.Sounds.DRINK);
+				updateQuickslot();
 				curUser.sprite.emitter().start(Speck.factory(Speck.LIGHT), 0.1f, 10);
 			}
 		}
@@ -181,7 +206,7 @@ public class LiquidMetal extends Item {
 				MissileWeapon m = (MissileWeapon) i;
 				float quantity = m.quantity()-1;
 				quantity += 0.25f + 0.0075f*m.durabilityLeft();
-				quantity *= Math.pow(2, m.level());
+				quantity *= Math.pow(2, Math.min(3, m.level()));
 				metalQuantity += Math.round((5*(m.tier+1))*quantity);
 			}
 

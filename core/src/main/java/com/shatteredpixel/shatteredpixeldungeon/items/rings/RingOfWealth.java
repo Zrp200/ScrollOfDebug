@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -197,11 +197,11 @@ public class RingOfWealth extends Ring {
 				Item i = new Gold().random();
 				return i.quantity(i.quantity()/2);
 			case 1:
-				return Generator.random(Generator.Category.STONE);
+				return Generator.randomUsingDefaults(Generator.Category.STONE);
 			case 2:
-				return Generator.random(Generator.Category.POTION);
+				return Generator.randomUsingDefaults(Generator.Category.POTION);
 			case 3:
-				return Generator.random(Generator.Category.SCROLL);
+				return Generator.randomUsingDefaults(Generator.Category.SCROLL);
 		}
 	}
 

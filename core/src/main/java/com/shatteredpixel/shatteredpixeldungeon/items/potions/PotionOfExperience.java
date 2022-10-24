@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@
 package com.shatteredpixel.shatteredpixeldungeon.items.potions;
 
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
+import com.shatteredpixel.shatteredpixeldungeon.effects.Flare;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 
 public class PotionOfExperience extends Potion {
@@ -36,10 +37,16 @@ public class PotionOfExperience extends Potion {
 	public void apply( Hero hero ) {
 		identify();
 		hero.earnExp( hero.maxExp(), getClass() );
+		new Flare( 6, 32 ).color(0xFFFF00, true).show( curUser.sprite, 2f );
 	}
 	
 	@Override
 	public int value() {
 		return isKnown() ? 50 * quantity : super.value();
+	}
+
+	@Override
+	public int energyVal() {
+		return isKnown() ? 8 * quantity : super.energyVal();
 	}
 }

@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -34,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.ui.IconButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
+import com.shatteredpixel.shatteredpixeldungeon.ui.TalentButton;
 import com.shatteredpixel.shatteredpixeldungeon.ui.TalentsPane;
 import com.watabou.noosa.Game;
 import com.watabou.noosa.Image;
@@ -172,7 +173,7 @@ public class WndHeroInfo extends WndTabbed {
 					break;
 				case ROGUE:
 					icons = new Image[]{ new ItemSprite(ItemSpriteSheet.ARTIFACT_CLOAK),
-							Icons.get(Icons.DEPTH),
+							Icons.get(Icons.STAIRS),
 							new ItemSprite(ItemSpriteSheet.DAGGER),
 							new ItemSprite(ItemSpriteSheet.SCROLL_ISAZ)};
 					break;
@@ -231,7 +232,7 @@ public class WndHeroInfo extends WndTabbed {
 			Talent.initClassTalents(cls, talents);
 			talents.get(2).clear(); //we show T3 talents with subclasses
 
-			talentPane = new TalentsPane(false, talents);
+			talentPane = new TalentsPane(TalentButton.Mode.INFO, talents);
 			add(talentPane);
 		}
 

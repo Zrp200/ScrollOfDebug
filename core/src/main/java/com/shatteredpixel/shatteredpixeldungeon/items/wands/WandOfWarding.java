@@ -1,11 +1,38 @@
+/*
+ * Pixel Dungeon
+ * Copyright (C) 2012-2015 Oleg Dolya
+ *
+ * Shattered Pixel Dungeon
+ * Copyright (C) 2014-2022 Evan Debenham
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
 package com.shatteredpixel.shatteredpixeldungeon.items.wands;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
+import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Dread;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Sleep;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Terror;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Vertigo;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.NPC;
 import com.shatteredpixel.shatteredpixeldungeon.effects.MagicMissile;
@@ -264,7 +291,7 @@ public class WandOfWarding extends Wand {
 		@Override
 		public int defenseSkill(Char enemy) {
 			if (tier > 3){
-				defenseSkill = 4 + Dungeon.depth;
+				defenseSkill = 4 + Dungeon.scalingDepth();
 			}
 			return super.defenseSkill(enemy);
 		}
@@ -272,7 +299,7 @@ public class WandOfWarding extends Wand {
 		@Override
 		public int drRoll() {
 			if (tier > 3){
-				return Math.round(Random.NormalIntRange(0, 3 + Dungeon.depth/2) / (7f - tier));
+				return Math.round(Random.NormalIntRange(0, 3 + Dungeon.scalingDepth()/2) / (7f - tier));
 			} else {
 				return 0;
 			}
@@ -306,6 +333,7 @@ public class WandOfWarding extends Wand {
 			}
 
 			if (!enemy.isAlive() && enemy == Dungeon.hero) {
+				Badges.validateDeathFromFriendlyMagic();
 				Dungeon.fail( getClass() );
 			}
 
@@ -400,7 +428,11 @@ public class WandOfWarding extends Wand {
 		}
 		
 		{
-			immunities.add( Corruption.class );
+			immunities.add( Sleep.class );
+			immunities.add( Terror.class );
+			immunities.add( Dread.class );
+			immunities.add( Vertigo.class );
+			immunities.add( AllyBuff.class );
 		}
 
 		private static final String TIER = "tier";
@@ -422,10 +454,6 @@ public class WandOfWarding extends Wand {
 			viewDistance = 3 + tier;
 			wandLevel = bundle.getInt(WAND_LEVEL);
 			totalZaps = bundle.getInt(TOTAL_ZAPS);
-		}
-		
-		{
-			properties.add(Property.IMMOVABLE);
 		}
 	}
 }

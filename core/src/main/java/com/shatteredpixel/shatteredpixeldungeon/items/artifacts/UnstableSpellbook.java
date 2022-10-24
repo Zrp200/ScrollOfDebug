@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -125,8 +125,6 @@ public class UnstableSpellbook extends Artifact {
 						||((scroll instanceof ScrollOfIdentify ||
 							scroll instanceof ScrollOfRemoveCurse ||
 							scroll instanceof ScrollOfMagicMapping) && Random.Int(2) == 0)
-						//don't roll teleportation scrolls on boss floors
-						|| (scroll instanceof ScrollOfTeleportation && Dungeon.bossLevel())
 						//cannot roll transmutation
 						|| (scroll instanceof ScrollOfTransmutation));
 				
@@ -158,6 +156,7 @@ public class UnstableSpellbook extends Artifact {
 								fScroll.doRead();
 								Talent.onArtifactUsed(Dungeon.hero);
 							}
+							updateQuickslot();
 						}
 						
 						@Override
@@ -192,6 +191,7 @@ public class UnstableSpellbook extends Artifact {
 				@Override
 				public void call() {
 					scroll.doRead();
+					Item.updateQuickslot();
 				}
 			});
 			detach();
@@ -320,7 +320,7 @@ public class UnstableSpellbook extends Artifact {
 
 		@Override
 		public boolean itemSelectable(Item item) {
-			return item instanceof Scroll && scrolls.contains(item.getClass());
+			return item instanceof Scroll && item.isIdentified() && scrolls.contains(item.getClass());
 		}
 
 		@Override

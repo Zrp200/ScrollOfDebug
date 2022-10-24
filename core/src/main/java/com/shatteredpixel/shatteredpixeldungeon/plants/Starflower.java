@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,6 +27,8 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Recharging;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Hero;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.HeroSubClass;
+import com.shatteredpixel.shatteredpixeldungeon.effects.Flare;
+import com.shatteredpixel.shatteredpixeldungeon.effects.SpellSprite;
 import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 
 public class Starflower extends Plant {
@@ -41,8 +43,10 @@ public class Starflower extends Plant {
 
 		if (ch != null) {
 			Buff.prolong(ch, Bless.class, Bless.DURATION);
+			new Flare( 6, 32 ).color(0xFFFF00, true).show( ch.sprite, 2f );
 			if (ch instanceof Hero && ((Hero) ch).subClass == HeroSubClass.WARDEN){
 				Buff.prolong(ch, Recharging.class, Recharging.DURATION);
+				SpellSprite.show( ch, SpellSprite.CHARGE );
 			}
 		}
 
@@ -59,6 +63,11 @@ public class Starflower extends Plant {
 		@Override
 		public int value() {
 			return 30 * quantity;
+		}
+
+		@Override
+		public int energyVal() {
+			return 3 * quantity;
 		}
 	}
 }

@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -114,7 +114,7 @@ public class Honeypot extends Item {
 		
 		if (newPos != -1) {
 			Bee bee = new Bee();
-			bee.spawn( Dungeon.depth );
+			bee.spawn( Dungeon.scalingDepth() );
 			bee.setPotInfo( pos, owner );
 			bee.HP = bee.HT;
 			bee.pos = newPos;
@@ -156,8 +156,8 @@ public class Honeypot extends Item {
 		}
 
 		@Override
-		public boolean doPickUp(Hero hero) {
-			if ( super.doPickUp(hero) ){
+		public boolean doPickUp(Hero hero, int pos) {
+			if ( super.doPickUp(hero, pos) ){
 				pickupPot( hero );
 				return true;
 			} else {

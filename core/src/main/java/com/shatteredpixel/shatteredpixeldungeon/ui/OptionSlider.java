@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -60,6 +60,11 @@ public abstract class OptionSlider extends Component {
 			active = false;
 		}
 
+		if (title.length() > 20){
+			remove(this.title);
+			this.title = PixelScene.renderTextBlock(6);
+			add(this.title);
+		}
 		this.title.text(title);
 		this.minTxt.text(minTxt);
 		this.maxTxt.text(maxTxt);

@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -44,6 +44,8 @@ public class Messages {
 
 	private static ArrayList<I18NBundle> bundles;
 	private static Languages lang;
+
+	public static final String NO_TEXT_FOUND = "!!!NO TEXT FOUND!!!";
 
 	public static Languages lang(){
 		return lang;
@@ -117,7 +119,7 @@ public class Messages {
 			if (c != null && c.getSuperclass() != null){
 				return get(c.getSuperclass(), k, args);
 			} else {
-				return "!!!NO TEXT FOUND!!!";
+				return NO_TEXT_FOUND;
 			}
 		}
 	}

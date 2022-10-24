@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,8 +23,8 @@ package com.shatteredpixel.shatteredpixeldungeon.scenes;
 
 import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
-import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Chrome;
+import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.Rankings;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
@@ -32,12 +32,13 @@ import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.effects.BannerSprites;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Fireball;
 import com.shatteredpixel.shatteredpixeldungeon.journal.Document;
-import com.shatteredpixel.shatteredpixeldungeon.messages.Languages;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Archs;
 import com.shatteredpixel.shatteredpixeldungeon.ui.Icons;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RenderedTextBlock;
 import com.shatteredpixel.shatteredpixeldungeon.ui.StyledButton;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndError;
+import com.shatteredpixel.shatteredpixeldungeon.windows.WndHardNotification;
 import com.watabou.glwrap.Blending;
 import com.watabou.noosa.Camera;
 import com.watabou.noosa.ColorBlock;
@@ -47,16 +48,33 @@ import com.watabou.noosa.audio.Music;
 import com.watabou.utils.FileUtils;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 
 public class WelcomeScene extends PixelScene {
 
-	private static final int LATEST_UPDATE = ShatteredPixelDungeon.v1_0_0;
+	private static final int LATEST_UPDATE = ShatteredPixelDungeon.v1_3_0;
 
 	@Override
 	public void create() {
 		super.create();
 
 		final int previousVersion = SPDSettings.version();
+
+		if (FileUtils.cleanTempFiles()){
+			add(new WndHardNotification(Icons.get(Icons.WARNING),
+					Messages.get(WndError.class, "title"),
+					Messages.get(this, "save_warning"),
+					Messages.get(this, "continue"),
+					5){
+				@Override
+				public void hide() {
+					super.hide();
+					ShatteredPixelDungeon.resetScene();
+				}
+			});
+			return;
+		}
 
 		if (ShatteredPixelDungeon.versionCode == previousVersion && !SPDSettings.intro()) {
 			ShatteredPixelDungeon.switchNoFade(TitleScene.class);
@@ -172,7 +190,7 @@ public class WelcomeScene extends PixelScene {
 		} else {
 			message = Messages.get(this, "what_msg");
 		}
-		text.text(message, w-20);
+		text.text(message, Math.min(w-20, 300));
 		float textSpace = okay.top() - topRegion - 4;
 		text.setPos((w - text.width()) / 2f, (topRegion + 2) + (textSpace - text.height())/2);
 		add(text);
@@ -201,12 +219,24 @@ public class WelcomeScene extends PixelScene {
 						ShatteredPixelDungeon.reportException(e);
 					}
 				}
+				if (Rankings.INSTANCE.latestDaily != null){
+					try {
+						Rankings.INSTANCE.loadGameData(Rankings.INSTANCE.latestDaily);
+						Rankings.INSTANCE.saveGameData(Rankings.INSTANCE.latestDaily);
+					} catch (Exception e) {
+						//if we encounter a fatal per-record error, then clear that record
+						Rankings.INSTANCE.latestDaily = null;
+						ShatteredPixelDungeon.reportException(e);
+					}
+				}
+				Collections.sort(Rankings.INSTANCE.records, Rankings.scoreComparator);
 				Rankings.INSTANCE.save();
 			} catch (Exception e) {
 				//if we encounter a fatal error, then just clear the rankings
 				FileUtils.deleteFile( Rankings.RANKINGS_FILE );
 				ShatteredPixelDungeon.reportException(e);
 			}
+			Dungeon.daily = false;
 
 		}
 
@@ -218,6 +248,11 @@ public class WelcomeScene extends PixelScene {
 					Document.ADVENTURERS_GUIDE.readPage(page);
 				}
 			}
+		}
+
+		//defaults to false for older users
+		if (previousVersion <= ShatteredPixelDungeon.v1_2_3){
+			SPDSettings.quickSwapper(false);
 		}
 
 		SPDSettings.version(ShatteredPixelDungeon.versionCode);

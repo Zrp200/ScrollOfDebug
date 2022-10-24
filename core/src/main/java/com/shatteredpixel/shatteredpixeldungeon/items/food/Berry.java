@@ -41,7 +41,10 @@ public class Berry extends Food {
 
 	@Override
 	protected float eatingTime(){
-		if (Dungeon.hero.hasTalent(Talent.INVIGORATING_MEAL)){
+		if (Dungeon.hero.hasTalent(Talent.IRON_STOMACH)
+				|| Dungeon.hero.hasTalent(Talent.ENERGIZING_MEAL)
+				|| Dungeon.hero.hasTalent(Talent.MYSTICAL_MEAL)
+				|| Dungeon.hero.hasTalent(Talent.INVIGORATING_MEAL)){
 			return 0;
 		} else {
 			return 1;
@@ -53,7 +56,7 @@ public class Berry extends Food {
 		super.satisfy(hero);
 		SeedCounter counter = Buff.count(hero, SeedCounter.class, 1);
 		if (counter.count() >= 2){
-			Dungeon.level.drop(Generator.random(Generator.Category.SEED), hero.pos).sprite.drop();
+			Dungeon.level.drop(Generator.randomUsingDefaults(Generator.Category.SEED), hero.pos).sprite.drop();
 			counter.detach();
 		}
 	}

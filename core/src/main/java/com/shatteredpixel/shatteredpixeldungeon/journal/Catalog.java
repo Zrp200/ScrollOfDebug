@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -334,21 +334,15 @@ public enum Catalog {
 		}
 		
 		//general save/load
-		//includes "catalogs" for pre-0.8.2 saves
-		if (bundle.contains("catalogs") || bundle.contains(CATALOG_ITEMS)) {
+		if (bundle.contains(CATALOG_ITEMS)) {
 			List<Class> seenClasses = new ArrayList<>();
 			if (bundle.contains(CATALOG_ITEMS)) {
 				seenClasses = Arrays.asList(bundle.getClassArray(CATALOG_ITEMS));
 			}
-			List<String> seenItems = new ArrayList<>();
-			if (bundle.contains("catalogs")) {
-				Journal.saveNeeded = true; //we want to overwrite with the newer storage format
-				seenItems = Arrays.asList(bundle.getStringArray("catalogs"));
-			}
 			
 			for (Catalog cat : values()) {
 				for (Class<? extends Item> item : cat.items()) {
-					if (seenClasses.contains(item) || seenItems.contains(item.getSimpleName())) {
+					if (seenClasses.contains(item)) {
 						cat.seen.put(item, true);
 					}
 				}

@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -51,6 +51,7 @@ public class BeaconOfReturning extends Spell {
 	}
 	
 	public int returnDepth	= -1;
+	public int returnBranch	= 0;
 	public int returnPos;
 	
 	@Override
@@ -94,6 +95,7 @@ public class BeaconOfReturning extends Spell {
 	
 	private void setBeacon(Hero hero ){
 		returnDepth = Dungeon.depth;
+		returnBranch = Dungeon.branch;
 		returnPos = hero.pos;
 		
 		hero.spend( 1f );
@@ -107,40 +109,40 @@ public class BeaconOfReturning extends Spell {
 	}
 	
 	private void returnBeacon( Hero hero ){
-		if (Dungeon.bossLevel()) {
-			GLog.w( Messages.get(this, "preventing") );
-			return;
-		}
 		
-		for (int i = 0; i < PathFinder.NEIGHBOURS8.length; i++) {
-			Char ch = Actor.findChar(hero.pos + PathFinder.NEIGHBOURS8[i]);
-			if (ch != null && ch.alignment == Char.Alignment.ENEMY) {
-				GLog.w( Messages.get(this, "creatures") );
-				return;
+		if (returnDepth == Dungeon.depth && returnBranch == Dungeon.branch) {
+
+			Char moving = Actor.findChar(returnPos);
+			if (moving != null){
+				moving.pos = returnPos+1;
 			}
-		}
-		
-		if (returnDepth == Dungeon.depth) {
-			if (!Dungeon.level.passable[returnPos] && !Dungeon.level.avoid[returnPos]){
-				returnPos = Dungeon.level.entrance;
-			}
-			ScrollOfTeleportation.appear( hero, returnPos );
-			for(Mob m : Dungeon.level.mobs){
-				if (m.pos == hero.pos){
-					//displace mob
+
+			if (ScrollOfTeleportation.teleportToLocation(hero, returnPos)){
+				if (moving != null){
+					moving.pos = returnPos;
 					for(int i : PathFinder.NEIGHBOURS8){
-						if (Actor.findChar(m.pos+i) == null && Dungeon.level.passable[m.pos + i]){
-							m.pos += i;
-							m.sprite.point(m.sprite.worldToCamera(m.pos));
+						if (Actor.findChar(moving.pos+i) == null
+								&& Dungeon.level.passable[moving.pos + i]
+								&& (!Char.hasProp(moving, Char.Property.LARGE) || Dungeon.level.openSpace[moving.pos + i])){
+							moving.pos += i;
+							moving.sprite.point(moving.sprite.worldToCamera(moving.pos));
 							break;
 						}
 					}
 				}
+			} else {
+				if (moving != null) {
+					moving.pos = returnPos;
+				}
+				return;
 			}
-			Dungeon.level.occupyCell(hero );
-			Dungeon.observe();
-			GameScene.updateFog();
+
 		} else {
+
+			if (!Dungeon.interfloorTeleportAllowed()) {
+				GLog.w( Messages.get(this, "preventing") );
+				return;
+			}
 
 			TimekeepersHourglass.timeFreeze timeFreeze = Dungeon.hero.buff(TimekeepersHourglass.timeFreeze.class);
 			if (timeFreeze != null) timeFreeze.disarmPressedTraps();
@@ -149,9 +151,11 @@ public class BeaconOfReturning extends Spell {
 			
 			InterlevelScene.mode = InterlevelScene.Mode.RETURN;
 			InterlevelScene.returnDepth = returnDepth;
+			InterlevelScene.returnBranch = returnBranch;
 			InterlevelScene.returnPos = returnPos;
 			Game.switchScene( InterlevelScene.class );
 		}
+		hero.spendAndNext( 1f );
 		detach(hero.belongings.backpack);
 	}
 	
@@ -202,7 +206,7 @@ public class BeaconOfReturning extends Spell {
 			inputs =  new Class[]{ScrollOfPassage.class, ArcaneCatalyst.class};
 			inQuantity = new int[]{1, 1};
 			
-			cost = 10;
+			cost = 6;
 			
 			output = BeaconOfReturning.class;
 			outQuantity = 5;

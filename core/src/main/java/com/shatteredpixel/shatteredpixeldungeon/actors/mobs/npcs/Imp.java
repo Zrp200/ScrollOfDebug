@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -22,7 +22,9 @@
 package com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs;
 
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AscensionChallenge;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Golem;
 import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.Mob;
@@ -55,7 +57,10 @@ public class Imp extends NPC {
 	
 	@Override
 	protected boolean act() {
-		
+		if (Dungeon.hero.buff(AscensionChallenge.class) != null){
+			die(null);
+			return true;
+		}
 		if (!Quest.given && Dungeon.level.heroFOV[pos]) {
 			if (!seenBefore) {
 				yell( Messages.get(this, "hey", Dungeon.hero.name() ) );
@@ -247,7 +252,8 @@ public class Imp extends NPC {
 		public static void complete() {
 			reward = null;
 			completed = true;
-			
+
+			Statistics.questScores[3] = 4000;
 			Notes.remove( Notes.Landmark.IMP );
 		}
 		

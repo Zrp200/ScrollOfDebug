@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -110,7 +110,7 @@ public class WarpBeacon extends ArmorAbility {
 						armor.charge -= chargeNeeded;
 						armor.updateQuickslot();
 
-						if (tracker.depth == Dungeon.depth){
+						if (tracker.depth == Dungeon.depth && tracker.branch == Dungeon.branch){
 							Char existing = Actor.findChar(tracker.pos);
 
 							ScrollOfTeleportation.appear(hero, tracker.pos);
@@ -155,11 +155,12 @@ public class WarpBeacon extends ArmorAbility {
 
 							Invisibility.dispel();
 							Dungeon.observe();
+							GameScene.updateFog();
 
 						} else {
 
-							if (hero.buff(LockedFloor.class) != null){
-								GLog.w( Messages.get(WarpBeacon.class, "locked_floor") );
+							if (!Dungeon.interfloorTeleportAllowed()){
+								GLog.w( Messages.get(ScrollOfTeleportation.class, "no_tele") );
 								return;
 							}
 
@@ -171,6 +172,7 @@ public class WarpBeacon extends ArmorAbility {
 
 							InterlevelScene.mode = InterlevelScene.Mode.RETURN;
 							InterlevelScene.returnDepth = tracker.depth;
+							InterlevelScene.returnBranch = tracker.branch;
 							InterlevelScene.returnPos = tracker.pos;
 							Game.switchScene( InterlevelScene.class );
 						}
@@ -186,7 +188,7 @@ public class WarpBeacon extends ArmorAbility {
 				return;
 			}
 
-			if (Dungeon.level.distance(hero.pos, target) > 3*hero.pointsInTalent(Talent.REMOTE_BEACON)){
+			if (Dungeon.level.distance(hero.pos, target) > 4*hero.pointsInTalent(Talent.REMOTE_BEACON)){
 				GLog.w( Messages.get(WarpBeacon.class, "too_far") );
 				return;
 			}
@@ -202,6 +204,7 @@ public class WarpBeacon extends ArmorAbility {
 			WarpBeaconTracker tracker = new WarpBeaconTracker();
 			tracker.pos = target;
 			tracker.depth = Dungeon.depth;
+			tracker.branch = Dungeon.branch;
 			tracker.attachTo(hero);
 
 			hero.sprite.operate(target);
@@ -219,6 +222,7 @@ public class WarpBeacon extends ArmorAbility {
 
 		int pos;
 		int depth;
+		int branch;
 
 		Emitter e;
 
@@ -233,12 +237,14 @@ public class WarpBeacon extends ArmorAbility {
 
 		public static final String POS = "pos";
 		public static final String DEPTH = "depth";
+		public static final String BRANCH = "branch";
 
 		@Override
 		public void storeInBundle(Bundle bundle) {
 			super.storeInBundle(bundle);
 			bundle.put(POS, pos);
 			bundle.put(DEPTH, depth);
+			bundle.put(BRANCH, branch);
 		}
 
 		@Override
@@ -246,6 +252,7 @@ public class WarpBeacon extends ArmorAbility {
 			super.restoreFromBundle(bundle);
 			pos = bundle.getInt(POS);
 			depth = bundle.getInt(DEPTH);
+			branch = bundle.getInt(BRANCH);
 		}
 	}
 

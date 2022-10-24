@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -101,7 +101,7 @@ public class ScrollOfUpgrade extends InventoryScroll {
 
 			item.upgrade();
 
-			if (wasCursed && !item.cursed){
+			if (item.cursedKnown && wasCursed && !item.cursed){
 				removeCurse( Dungeon.hero );
 			}
 
@@ -133,5 +133,10 @@ public class ScrollOfUpgrade extends InventoryScroll {
 	@Override
 	public int value() {
 		return isKnown() ? 50 * quantity : super.value();
+	}
+
+	@Override
+	public int energyVal() {
+		return isKnown() ? 8 * quantity : super.energyVal();
 	}
 }

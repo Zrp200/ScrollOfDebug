@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,7 +36,7 @@ public class ScrollOfAntiMagic extends ExoticScroll {
 	public void doRead() {
 		
 		Buff.affect( curUser, MagicImmune.class, MagicImmune.DURATION );
-		new Flare( 5, 32 ).color( 0xFF0000, true ).show( curUser.sprite, 2f );
+		new Flare( 5, 32 ).color( 0x00FF00, true ).show( curUser.sprite, 2f );
 
 		identify();
 		

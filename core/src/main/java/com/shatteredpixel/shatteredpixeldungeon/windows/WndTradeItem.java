@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,19 +31,25 @@ import com.shatteredpixel.shatteredpixeldungeon.items.Heap;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.MasterThievesArmband;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSprite;
+import com.shatteredpixel.shatteredpixeldungeon.sprites.ItemSpriteSheet;
 import com.shatteredpixel.shatteredpixeldungeon.ui.RedButton;
 
 public class WndTradeItem extends WndInfoItem {
 
 	private static final float GAP		= 2;
-	private static final int BTN_HEIGHT	= 16;
+	private static final int BTN_HEIGHT	= 18;
 
 	private WndBag owner;
+
+	private boolean selling = false;
 
 	//selling
 	public WndTradeItem( final Item item, WndBag owner ) {
 
 		super(item);
+
+		selling = true;
 
 		this.owner = owner;
 
@@ -59,6 +65,7 @@ public class WndTradeItem extends WndInfoItem {
 				}
 			};
 			btnSell.setRect( 0, pos + GAP, width, BTN_HEIGHT );
+			btnSell.icon(new ItemSprite(ItemSpriteSheet.GOLD));
 			add( btnSell );
 
 			pos = btnSell.bottom();
@@ -74,6 +81,7 @@ public class WndTradeItem extends WndInfoItem {
 				}
 			};
 			btnSell1.setRect( 0, pos + GAP, width, BTN_HEIGHT );
+			btnSell1.icon(new ItemSprite(ItemSpriteSheet.GOLD));
 			add( btnSell1 );
 			RedButton btnSellAll = new RedButton( Messages.get(this, "sell_all", priceAll ) ) {
 				@Override
@@ -83,6 +91,7 @@ public class WndTradeItem extends WndInfoItem {
 				}
 			};
 			btnSellAll.setRect( 0, btnSell1.bottom() + 1, width, BTN_HEIGHT );
+			btnSellAll.icon(new ItemSprite(ItemSpriteSheet.GOLD));
 			add( btnSellAll );
 
 			pos = btnSellAll.bottom();
@@ -96,6 +105,8 @@ public class WndTradeItem extends WndInfoItem {
 	public WndTradeItem( final Heap heap ) {
 
 		super(heap);
+
+		selling = false;
 
 		Item item = heap.peek();
 
@@ -111,18 +122,20 @@ public class WndTradeItem extends WndInfoItem {
 			}
 		};
 		btnBuy.setRect( 0, pos + GAP, width, BTN_HEIGHT );
+		btnBuy.icon(new ItemSprite(ItemSpriteSheet.GOLD));
 		btnBuy.enable( price <= Dungeon.gold );
 		add( btnBuy );
 
 		pos = btnBuy.bottom();
 
 		final MasterThievesArmband.Thievery thievery = Dungeon.hero.buff(MasterThievesArmband.Thievery.class);
-		if (thievery != null && !thievery.isCursed()) {
-			final float chance = thievery.stealChance(price);
-			RedButton btnSteal = new RedButton(Messages.get(this, "steal", Math.min(100, (int) (chance * 100)))) {
+		if (thievery != null && !thievery.isCursed() && thievery.chargesToUse(item) > 0) {
+			final float chance = thievery.stealChance(item);
+			final int chargesToUse = thievery.chargesToUse(item);
+			RedButton btnSteal = new RedButton(Messages.get(this, "steal", Math.min(100, (int) (chance * 100)), chargesToUse), 6) {
 				@Override
 				protected void onClick() {
-					if (thievery.steal(price)) {
+					if (thievery.steal(item)) {
 						Hero hero = Dungeon.hero;
 						Item item = heap.pickUp();
 						hide();
@@ -143,6 +156,7 @@ public class WndTradeItem extends WndInfoItem {
 				}
 			};
 			btnSteal.setRect(0, pos + 1, width, BTN_HEIGHT);
+			btnSteal.icon(new ItemSprite(ItemSpriteSheet.ARTIFACT_ARMBAND));
 			add(btnSteal);
 
 			pos = btnSteal.bottom();
@@ -159,11 +173,11 @@ public class WndTradeItem extends WndInfoItem {
 		
 		if (owner != null) {
 			owner.hide();
-			Shopkeeper.sell();
 		}
+		if (selling) Shopkeeper.sell();
 	}
 	
-	private void sell( Item item ) {
+	public static void sell( Item item ) {
 		
 		Hero hero = Dungeon.hero;
 		
@@ -177,8 +191,8 @@ public class WndTradeItem extends WndInfoItem {
 
 		new Gold( item.value() ).doPickUp( hero );
 	}
-	
-	private void sellOne( Item item ) {
+
+	public static void sellOne( Item item ) {
 		
 		if (item.quantity() <= 1) {
 			sell( item );

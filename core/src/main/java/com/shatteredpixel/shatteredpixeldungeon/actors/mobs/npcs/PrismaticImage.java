@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.CorrosiveGas;
 import com.shatteredpixel.shatteredpixeldungeon.actors.blobs.ToxicGas;
+import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.AllyBuff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Burning;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Corruption;
@@ -48,7 +49,7 @@ public class PrismaticImage extends NPC {
 	{
 		spriteClass = PrismaticSprite.class;
 		
-		HP = HT = 8;
+		HP = HT = 10;
 		defenseSkill = 1;
 		
 		alignment = Alignment.ALLY;
@@ -145,9 +146,9 @@ public class PrismaticImage extends NPC {
 	@Override
 	public int damageRoll() {
 		if (hero != null) {
-			return Random.NormalIntRange( 1 + hero.lvl/8, 4 + hero.lvl/2 );
+			return Random.NormalIntRange( 2 + hero.lvl/4, 4 + hero.lvl/2 );
 		} else {
-			return Random.NormalIntRange( 1, 4 );
+			return Random.NormalIntRange( 2, 4 );
 		}
 	}
 	
@@ -249,7 +250,7 @@ public class PrismaticImage extends NPC {
 		immunities.add( ToxicGas.class );
 		immunities.add( CorrosiveGas.class );
 		immunities.add( Burning.class );
-		immunities.add( Corruption.class );
+		immunities.add( AllyBuff.class );
 	}
 	
 	private class Wandering extends Mob.Wandering{

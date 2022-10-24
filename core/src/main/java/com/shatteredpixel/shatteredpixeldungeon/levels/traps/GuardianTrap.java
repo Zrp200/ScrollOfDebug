@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -58,8 +58,10 @@ public class GuardianTrap extends Trap {
 			Guardian guardian = new Guardian();
 			guardian.state = guardian.WANDERING;
 			guardian.pos = Dungeon.level.randomRespawnCell( guardian );
-			GameScene.add(guardian);
-			guardian.beckon(Dungeon.hero.pos );
+			if (guardian.pos != -1) {
+				GameScene.add(guardian);
+				guardian.beckon(Dungeon.hero.pos);
+			}
 		}
 
 	}

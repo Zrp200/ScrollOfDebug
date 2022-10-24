@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ import com.shatteredpixel.shatteredpixeldungeon.Assets;
 import com.shatteredpixel.shatteredpixeldungeon.Badges;
 import com.shatteredpixel.shatteredpixeldungeon.Challenges;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
+import com.shatteredpixel.shatteredpixeldungeon.Statistics;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Char;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Barrier;
@@ -33,6 +34,7 @@ import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Buff;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.Doom;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LifeLink;
 import com.shatteredpixel.shatteredpixeldungeon.actors.buffs.LockedFloor;
+import com.shatteredpixel.shatteredpixeldungeon.actors.mobs.npcs.Sheep;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Beam;
 import com.shatteredpixel.shatteredpixeldungeon.effects.CellEmitter;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Pushing;
@@ -46,7 +48,10 @@ import com.shatteredpixel.shatteredpixeldungeon.items.KingsCrown;
 import com.shatteredpixel.shatteredpixeldungeon.items.armor.glyphs.Viscosity;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.DriedRose;
 import com.shatteredpixel.shatteredpixeldungeon.items.artifacts.LloydsBeacon;
+import com.shatteredpixel.shatteredpixeldungeon.items.rings.RingOfForce;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.Wand;
+import com.shatteredpixel.shatteredpixeldungeon.items.wands.WandOfLightning;
 import com.shatteredpixel.shatteredpixeldungeon.levels.CityBossLevel;
 import com.shatteredpixel.shatteredpixeldungeon.mechanics.Ballistica;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -138,6 +143,10 @@ public class DwarfKing extends Mob {
 
 	@Override
 	protected boolean act() {
+		if (pos == CityBossLevel.throne){
+			throwItems();
+		}
+
 		if (phase == 1) {
 
 			if (summonCooldown <= 0 && summonSubject(Dungeon.isChallenged(Challenges.STRONGER_BOSSES) ? 2 : 3)){
@@ -431,6 +440,16 @@ public class DwarfKing extends Mob {
 
 	@Override
 	public void damage(int dmg, Object src) {
+		//hero only counts as unarmed if they have no weapon and aren't benefiting from force
+		if (src == Dungeon.hero && (Dungeon.hero.belongings.weapon() != null || Dungeon.hero.buff(RingOfForce.Force.class) != null)){
+			Statistics.qualifiedForBossChallengeBadge = false;
+		//Corrosion, corruption, and regrowth do no direct damage and so have their own custom logic
+		//Transfusion damages DK and so doesn't need custom logic
+		//Lightning has custom logic so that chaining it doesn't DQ for the badge
+		} else if (src instanceof Wand && !(src instanceof WandOfLightning)){
+			Statistics.qualifiedForBossChallengeBadge = false;
+		}
+
 		if (isInvulnerable(src.getClass())){
 			super.damage(dmg, src);
 			return;
@@ -509,6 +528,10 @@ public class DwarfKing extends Mob {
 		}
 
 		Badges.validateBossSlain();
+		if (Statistics.qualifiedForBossChallengeBadge){
+			Badges.validateBossChallengeCompleted();
+		}
+		Statistics.bossScores[3] += 4000;
 
 		Dungeon.level.unseal();
 
@@ -554,6 +577,14 @@ public class DwarfKing extends Mob {
 	public static class DKWarlock extends Warlock {
 		{
 			state = HUNTING;
+		}
+
+		@Override
+		protected void zap() {
+			if (enemy == Dungeon.hero){
+				Statistics.bossScores[3] -= 400;
+			}
+			super.zap();
 		}
 	}
 
@@ -606,6 +637,11 @@ public class DwarfKing extends Mob {
 					if (!candidates.isEmpty()){
 						pos = Random.element(candidates);
 					}
+				}
+
+				//kill sheep that are right on top of the spawner instead of failing to spawn
+				if (Actor.findChar(pos) instanceof Sheep){
+					Actor.findChar(pos).die(null);
 				}
 
 				if (Actor.findChar(pos) == null) {

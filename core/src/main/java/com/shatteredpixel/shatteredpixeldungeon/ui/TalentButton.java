@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,18 +26,18 @@ import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.hero.Talent;
 import com.shatteredpixel.shatteredpixeldungeon.effects.Speck;
+import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.exotic.ScrollOfMetamorphosis;
+import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
+import com.shatteredpixel.shatteredpixeldungeon.scenes.GameScene;
 import com.shatteredpixel.shatteredpixeldungeon.scenes.PixelScene;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndInfoTalent;
-import com.watabou.gltextures.SmartTexture;
-import com.watabou.gltextures.TextureCache;
 import com.watabou.noosa.ColorBlock;
 import com.watabou.noosa.Image;
 import com.watabou.noosa.PointerArea;
-import com.watabou.noosa.TextureFilm;
 import com.watabou.noosa.audio.Sample;
 import com.watabou.noosa.particles.Emitter;
-import com.watabou.noosa.ui.Button;
-import com.watabou.utils.Callback;
+
+import java.util.LinkedHashMap;
 
 public class TalentButton extends Button {
 
@@ -47,21 +47,28 @@ public class TalentButton extends Button {
 	int tier;
 	Talent talent;
 	int pointsInTalent;
-	boolean upgradeEnabled;
+	Mode mode;
 
 	TalentIcon icon;
 	Image bg;
 
 	ColorBlock fill;
 
-	public TalentButton(int tier, Talent talent, int points, boolean upgradeEnabled){
+	public enum Mode {
+		INFO,
+		UPGRADE,
+		METAMORPH_CHOOSE,
+		METAMORPH_REPLACE
+	}
+
+	public TalentButton(int tier, Talent talent, int points, Mode mode){
 		super();
 		hotArea.blockLevel = PointerArea.NEVER_BLOCK;
 
 		this.tier = tier;
 		this.talent = talent;
 		this.pointsInTalent = points;
-		this.upgradeEnabled = upgradeEnabled;
+		this.mode = mode;
 
 		bg.frame(20*(talent.maxPoints()-1), 0, WIDTH, HEIGHT);
 
@@ -103,19 +110,113 @@ public class TalentButton extends Button {
 	protected void onClick() {
 		super.onClick();
 
-		if (upgradeEnabled
+		Window toAdd;
+		if (mode == Mode.UPGRADE
 				&& Dungeon.hero != null
 				&& Dungeon.hero.isAlive()
 				&& Dungeon.hero.talentPointsAvailable(tier) > 0
 				&& Dungeon.hero.pointsInTalent(talent) < talent.maxPoints()){
-			ShatteredPixelDungeon.scene().addToFront(new WndInfoTalent(talent, pointsInTalent, new Callback() {
+			toAdd = new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
+
+				@Override
+				public String prompt() {
+					return Messages.titleCase(Messages.get(WndInfoTalent.class, "upgrade"));
+				}
+
 				@Override
 				public void call() {
 					upgradeTalent();
 				}
-			}));
+			});
+		} else if (mode == Mode.METAMORPH_CHOOSE && Dungeon.hero != null && Dungeon.hero.isAlive()) {
+			toAdd = new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
+
+				@Override
+				public String prompt() {
+					return Messages.titleCase(Messages.get(ScrollOfMetamorphosis.class, "metamorphose_talent"));
+				}
+
+				@Override
+				public boolean metamorphDesc() {
+					return true;
+				}
+
+				@Override
+				public void call() {
+					if (ScrollOfMetamorphosis.WndMetamorphChoose.INSTANCE != null){
+						ScrollOfMetamorphosis.WndMetamorphChoose.INSTANCE.hide();
+					}
+					GameScene.show(new ScrollOfMetamorphosis.WndMetamorphReplace(talent, tier));
+				}
+			});
+		} else if (mode == Mode.METAMORPH_REPLACE && Dungeon.hero != null && Dungeon.hero.isAlive()) {
+			toAdd = new WndInfoTalent(talent, pointsInTalent, new WndInfoTalent.TalentButtonCallback() {
+
+				@Override
+				public String prompt() {
+					return Messages.titleCase(Messages.get(ScrollOfMetamorphosis.class, "metamorphose_talent"));
+				}
+
+				@Override
+				public boolean metamorphDesc() {
+					return true;
+				}
+
+				@Override
+				public void call() {
+					Talent replacing = ScrollOfMetamorphosis.WndMetamorphReplace.INSTANCE.replacing;
+
+					for (LinkedHashMap<Talent, Integer> tier : Dungeon.hero.talents){
+						if (tier.containsKey(replacing)){
+							LinkedHashMap<Talent, Integer> newTier = new LinkedHashMap<>();
+							for (Talent t : tier.keySet()){
+								if (t == replacing){
+									newTier.put(talent, tier.get(replacing));
+
+									if (!Dungeon.hero.metamorphedTalents.containsValue(replacing)){
+										Dungeon.hero.metamorphedTalents.put(replacing, talent);
+
+									//if what we're replacing is already a value, we need to simplify the data structure
+									} else {
+										//a->b->a, we can just remove the entry entirely
+										if (Dungeon.hero.metamorphedTalents.get(talent) == replacing){
+											Dungeon.hero.metamorphedTalents.remove(talent);
+
+										//a->b->c, we need to simplify to a->c
+										} else {
+											for (Talent t2 : Dungeon.hero.metamorphedTalents.keySet()){
+												if (Dungeon.hero.metamorphedTalents.get(t2) == replacing){
+													Dungeon.hero.metamorphedTalents.put(t2, talent);
+												}
+											}
+										}
+									}
+
+								} else {
+									newTier.put(t, tier.get(t));
+								}
+							}
+							Dungeon.hero.talents.set(ScrollOfMetamorphosis.WndMetamorphReplace.INSTANCE.tier-1, newTier);
+							break;
+						}
+					}
+
+					ScrollOfMetamorphosis.onMetamorph(replacing, talent);
+
+					if (ScrollOfMetamorphosis.WndMetamorphReplace.INSTANCE != null){
+						ScrollOfMetamorphosis.WndMetamorphReplace.INSTANCE.hide();
+					}
+
+				}
+			});
 		} else {
-			ShatteredPixelDungeon.scene().addToFront(new WndInfoTalent(talent, pointsInTalent, null));
+			toAdd = new WndInfoTalent(talent, pointsInTalent, null);
+		}
+
+		if (ShatteredPixelDungeon.scene() instanceof GameScene){
+			GameScene.show(toAdd);
+		} else {
+			ShatteredPixelDungeon.scene().addToFront(toAdd);
 		}
 	}
 
@@ -132,7 +233,12 @@ public class TalentButton extends Button {
 		bg.resetColor();
 	}
 
-	public void enable( boolean value ) {
+	@Override
+	protected String hoverText() {
+		return Messages.titleCase(talent.title());
+	}
+
+	public void enable(boolean value ) {
 		active = value;
 		icon.alpha( value ? 1.0f : 0.3f );
 		bg.alpha( value ? 1.0f : 0.3f );

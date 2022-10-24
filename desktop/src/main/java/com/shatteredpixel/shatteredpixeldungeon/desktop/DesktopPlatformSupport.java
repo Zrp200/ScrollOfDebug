@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,23 +25,38 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.g2d.PixmapPacker;
 import com.badlogic.gdx.graphics.g2d.freetype.FreeTypeFontGenerator;
+import com.badlogic.gdx.utils.SharedLibraryLoader;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.watabou.noosa.Game;
 import com.watabou.utils.PlatformSupport;
 import com.watabou.utils.Point;
 
+import java.awt.Desktop;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class DesktopPlatformSupport extends PlatformSupport {
-	
+
+	//we recall previous window sizes as a workaround to not save maximized size to settings
+	//have to do this as updateDisplaySize is called before maximized is set =S
+	protected static Point[] previousSizes = null;
+
 	@Override
 	public void updateDisplaySize() {
-		//FIXME we still set window resolution when game becomes maximized =/
-		if (!SPDSettings.fullscreen()) {
-			SPDSettings.windowResolution( new Point( Game.width, Game.height ) );
+		if (previousSizes == null){
+			previousSizes = new Point[2];
+			previousSizes[0] = previousSizes[1] = new Point(Game.width, Game.height);
+		} else {
+			previousSizes[1] = previousSizes[0];
+			previousSizes[0] = new Point(Game.width, Game.height);
 		}
+		if (!SPDSettings.fullscreen()) {
+			SPDSettings.windowResolution( previousSizes[0] );
+		}
+		//TODO fixes an in libGDX v1.11.0 with macOS displays
+		Gdx.gl.glViewport(0, 0, Gdx.graphics.getBackBufferWidth(), Gdx.graphics.getBackBufferHeight());
 	}
 	
 	@Override
@@ -63,6 +78,7 @@ public class DesktopPlatformSupport extends PlatformSupport {
 	public boolean connectedToUnmeteredNetwork() {
 		return true; //no easy way to check this in desktop, just assume user doesn't care
 	}
+
 	/* FONT SUPPORT */
 	
 	//custom pixel font, for use with Latin and Cyrillic languages

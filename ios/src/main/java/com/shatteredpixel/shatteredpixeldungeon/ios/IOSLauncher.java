@@ -1,8 +1,30 @@
+/*
+ * Pixel Dungeon
+ * Copyright (C) 2012-2015 Oleg Dolya
+ *
+ * Shattered Pixel Dungeon
+ * Copyright (C) 2014-2022 Evan Debenham
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+
 package com.shatteredpixel.shatteredpixeldungeon.ios;
 
 import com.badlogic.gdx.Files;
 import com.badlogic.gdx.backends.iosrobovm.IOSApplication;
 import com.badlogic.gdx.backends.iosrobovm.IOSApplicationConfiguration;
+import com.badlogic.gdx.backends.iosrobovm.IOSPreferences;
 import com.badlogic.gdx.graphics.glutils.HdpiMode;
 import com.shatteredpixel.shatteredpixeldungeon.SPDSettings;
 import com.shatteredpixel.shatteredpixeldungeon.ShatteredPixelDungeon;
@@ -18,9 +40,16 @@ import org.robovm.apple.foundation.NSAutoreleasePool;
 import org.robovm.apple.foundation.NSBundle;
 import org.robovm.apple.foundation.NSDictionary;
 import org.robovm.apple.foundation.NSException;
+import org.robovm.apple.foundation.NSMutableDictionary;
+import org.robovm.apple.foundation.NSObject;
+import org.robovm.apple.foundation.NSProcessInfo;
+import org.robovm.apple.foundation.NSString;
 import org.robovm.apple.glkit.GLKViewDrawableColorFormat;
 import org.robovm.apple.glkit.GLKViewDrawableDepthFormat;
 import org.robovm.apple.uikit.UIApplication;
+import org.robovm.apple.uikit.UIScreen;
+
+import java.io.File;
 
 public class IOSLauncher extends IOSApplication.Delegate {
 	@Override
@@ -53,11 +82,35 @@ public class IOSLauncher extends IOSApplication.Delegate {
 
 		FileUtils.setDefaultFileProperties(Files.FileType.Local, "");
 
+		//sets up preferences early so they can be read.
+		//this is mostly a copy-paste from IOSApplication.getPreferences
+			File libraryPath = new File(System.getenv("HOME"), "Library");
+			File finalPath = new File(libraryPath, SPDSettings.DEFAULT_PREFS_FILE + ".plist");
+
+			@SuppressWarnings("unchecked")
+			NSMutableDictionary<NSString, NSObject> nsDictionary = (NSMutableDictionary<NSString, NSObject>)NSMutableDictionary
+					.read(finalPath);
+
+			// if it fails to get an existing dictionary, create a new one.
+			if (nsDictionary == null) {
+				nsDictionary = new NSMutableDictionary<NSString, NSObject>();
+				nsDictionary.write(finalPath, false);
+			}
+			SPDSettings.set(new IOSPreferences(nsDictionary, finalPath.getAbsolutePath()));
+		//end of prefs setup
+
 		IOSApplicationConfiguration config = new IOSApplicationConfiguration();
 
 		config.colorFormat = GLKViewDrawableColorFormat.RGBA8888;
 		config.depthFormat = GLKViewDrawableDepthFormat.None;
 		config.hdpiMode = HdpiMode.Pixels;
+
+		config.hideHomeIndicator = SPDSettings.fullscreen();
+		config.overrideRingerSwitch = SPDSettings.ignoreSilentMode();
+
+		if (NSProcessInfo.getSharedProcessInfo().getOperatingSystemVersion().getMajorVersion() >= 11) {
+			config.preferredFramesPerSecond = (int)(UIScreen.getMainScreen().getMaximumFramesPerSecond());
+		}
 
 		CGRect statusBarFrame = UIApplication.getSharedApplication().getStatusBarFrame();
 		double statusBarHeight = Math.min(statusBarFrame.getWidth(), statusBarFrame.getHeight());

@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,12 +37,12 @@ public class SoulMark extends FlavourBuff {
 
 	@Override
 	public int icon() {
-		return BuffIndicator.CORRUPT;
+		return BuffIndicator.INVERT_MARK;
 	}
 
 	@Override
 	public void tintIcon(Image icon) {
-		icon.hardlight(0.5f, 0.5f, 0.5f);
+		icon.hardlight(0.5f, 0.2f, 1f);
 	}
 
 	@Override

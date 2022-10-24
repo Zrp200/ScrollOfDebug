@@ -3,7 +3,7 @@
  * Copyright (C) 2012-2015 Oleg Dolya
  *
  * Shattered Pixel Dungeon
- * Copyright (C) 2014-2021 Evan Debenham
+ * Copyright (C) 2014-2022 Evan Debenham
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -96,7 +96,7 @@ public class Earthroot extends Plant {
 		}
 		
 		private static int blocking(){
-			return (Dungeon.depth + 5)/2;
+			return (Dungeon.scalingDepth() + 5)/2;
 		}
 		
 		public int absorb( int damage ) {
@@ -125,6 +125,11 @@ public class Earthroot extends Plant {
 		@Override
 		public float iconFadePercent() {
 			return Math.max(0, (target.HT - level) / (float) target.HT);
+		}
+
+		@Override
+		public String iconTextDisplay() {
+			return Integer.toString(level);
 		}
 		
 		@Override
