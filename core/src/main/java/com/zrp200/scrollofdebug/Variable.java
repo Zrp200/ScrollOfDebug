@@ -1,6 +1,5 @@
 package com.zrp200.scrollofdebug;
 
-import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
 import com.shatteredpixel.shatteredpixeldungeon.items.Item;
 import com.shatteredpixel.shatteredpixeldungeon.messages.Messages;
@@ -10,17 +9,14 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndBag;
 import com.shatteredpixel.shatteredpixeldungeon.windows.WndOptions;
 import com.watabou.noosa.Game;
-import com.watabou.utils.Bundlable;
-import com.watabou.utils.Bundle;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.HashMap;
 
 abstract public class Variable<T> {
-    private static final HashMap<String, Variable> all = new HashMap();
+    @SuppressWarnings("rawtypes")
+    public static final HashMap<String, Variable> assigned = new HashMap<>();
 
     public static final String MARKER = "@";
 
@@ -78,18 +74,16 @@ abstract public class Variable<T> {
         });
     }
 
-    static void put(String key, Object o) {
-        if (key == null) return; // no variable to store.
-        Variable variable;
-        if (o instanceof Actor) {
-            all.put(key, variable = new ActorVariable((Actor) o));
-        } else all.put(key, variable = new ObjectVariable(o));
-        GLog.p("%s = %s", key, variable);
+    static <T> void put(String key, T o) {
+        if (key == null || o == null) return; // no variable to store.
+        Variable<T> v = wrap(o);
+        assigned.put(key, v);
+        GLog.p("%s = %s", key, v);
     }
 
     static Object get(String key) {
         if(key.startsWith(MARKER)) {
-            Variable v = getActive().get(key);
+            Variable<?> v = assigned.get(key);
             if(v != null) return v.getTarget();
         }
         return null;
@@ -115,21 +109,6 @@ abstract public class Variable<T> {
         return expectedClass.isInstance(o) ? (T)o : null;
     }
 
-    public static HashMap<String, Variable> getActive() {
-        HashMap<String, Variable> active = new HashMap(all);
-        {
-            Iterator<Map.Entry<String, Variable>> entries = all.entrySet().iterator();
-            Map.Entry<?, Variable> entry;
-            while (entries.hasNext()) {
-                entry = entries.next();
-                if (!entry.getValue().isActive()) {
-                    entries.remove();
-                }
-            }
-        }
-        return active;
-    }
-
     abstract T getTarget();
 
     boolean isActive() {
@@ -147,47 +126,39 @@ abstract public class Variable<T> {
         return obj != null && obj.getClass() == getClass() && hashCode() == obj.hashCode();
     }
 
+    static String toString(String key) {
+        Variable<?> v = assigned.get(key);
+        return v != null ? v.toString() : null;
+    }
+
     @Override
     public String toString() {
         T target = getTarget();
         if (target == null) return null;
-        Class c = target.getClass();
-        String objectAsString = c.getSimpleName();
+        Class<?> c = target.getClass();
         try {
             // if we have a pretty toString, use that instead.
             if (c.isPrimitive() || c.getMethod("toString").getDeclaringClass() != Object.class) {
-                objectAsString = target.toString();
+                return target.toString();
+            } else {
+                // check for dedicated "name" method that is often implemented by game objects
+                return (String)c.getMethod("name").invoke(target);
             }
-        } catch (NoSuchMethodException e) {/*impossible*/}
-        return objectAsString;
+        } catch (Exception e) { return c.getSimpleName(); }
     }
 
-//    @Override
-//    public void storeInBundle(Bundle bundle) {}
-//
-//    @Override
-//    public void restoreFromBundle(Bundle bundle) {}
-
-    public static class ObjectVariable extends Variable<Object> {
-        private final Object target;
-        ObjectVariable(Object target) {
-            this.target = target;
-        }
-        @Override
-        Object getTarget() {
-            return target;
-        }
+    @SuppressWarnings("unchecked")
+    static <T> Variable<T> wrap(T target) {
+        return target instanceof Actor ? (Variable<T>) new ActorVariable((Actor)target) :
+                new Variable<T>() { @Override T getTarget() { return target; } };
     }
 
+    // actors can be retrieved by id instead of by reference
     public static class ActorVariable extends Variable<Actor> {
-        private int id, depth;
-
-        @Deprecated
-        ActorVariable() {} // for Bundling only
+        private final int id;
 
         ActorVariable(Actor actor) {
             id = actor.id();
-            depth = Dungeon.depth;
         }
 
         @Override
@@ -195,29 +166,8 @@ abstract public class Variable<T> {
 
         @Override
         public String toString() {
-            Actor target = getTarget();
-            if (target == null) return null;
-            Class c = target.getClass();
-            String objectAsString = c.getSimpleName();
-            try {
-                // if we have a pretty toString, use that instead.
-                if(c.getMethod("toString").getDeclaringClass() != Object.class) {
-                    objectAsString = target.toString();
-                }
-            } catch (NoSuchMethodException e) {/*impossible*/}
-            return objectAsString + " (id=" + id + ")";
+            String toString = super.toString();
+            return toString != null ? toString + " (id=" + id + ")" : null;
         }
-
-//        @Override
-//        public void storeInBundle(Bundle bundle) {
-//            bundle.put("id", id);
-//            bundle.put("depth", depth);
-//        }
-//
-//        @Override
-//        public void restoreFromBundle(Bundle bundle) {
-//            id = bundle.getInt("id");
-//            depth = bundle.getInt("depth");
-//        }
     }
 }
