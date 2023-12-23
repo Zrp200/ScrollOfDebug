@@ -57,7 +57,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v1.2.2
+ * @version v1.2.3
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -728,9 +728,25 @@ public class ScrollOfDebug extends Scroll {
             Class type = params[i];
             args[i] = Variable.get(input[j], type);
             if(args[i] != null) j++; // successful variable call.
+            // primitive type checks
             else if (type == int.class || type == Integer.class) {
                 args[i] = Integer.parseInt(input[j++]);
             }
+            else if (type == char.class || type == Character.class) {
+                // check if it's a length of 1. If it is, just use that, otherwise fail.
+                String fullStr = input[j++];
+                if (fullStr.length() != 1) throw new NumberFormatException("Unable to coerce " + fullStr + "to char");
+                args[i] = fullStr.charAt(0);
+            }
+            else if (type == long.class || type == Long.class)
+                args[i] = Long.parseLong(input[j++]);
+            // being through, nothing actually uses these (I hope)
+            else if (type == short.class || type == Short.class)
+                args[i] = Short.parseShort(input[j++]);
+            else if (type == byte.class || type == Byte.class)
+                args[i] = Byte.parseByte(input[j++]);
+            else if (type == double.class || type == Double.class)
+                args[i] = Double.parseDouble(input[j++]);
             else if (type == float.class || type == Float.class)
                 args[i] = Float.parseFloat(input[j++]);
             else if (type == String.class)
@@ -753,29 +769,26 @@ public class ScrollOfDebug extends Scroll {
                 j++;
             }
             else {
-                // non-primitive object retrieval
-                if(Char.class.isAssignableFrom(type)) {
-                    // two subclasses, which means two possible ways for this to go.
-                    if (type.isAssignableFrom(Hero.class) && input[j].equalsIgnoreCase("hero")) {
-                        params[i] = Hero.class;
-                        j++;
-                    }
+                // note: the only drawback of this is that it makes it harder to pass the class version of hero or level as an Object.
+                // -- substitution logic for major dungeon objects
+                if(type.isInstance(curUser) && input[j].equalsIgnoreCase("hero")) {
+                    type = Hero.class;
+                    j++;
                 }
-                else if(type != Object.class && type.isInstance(Dungeon.level)) {
-                    if(input[j].equals("level")) j++; // for easier understanding.
-                    args[i] = Dungeon.level;
-                    continue;
+                if(type.isInstance(Dungeon.level) && input[j].equalsIgnoreCase("level")) {
+                    type = Dungeon.level.getClass();
+                    j++; // for easier understanding.
                 }
 
                 args[i] =
                         type == Hero.class ? curUser :// autofill hero
                         Class.class.isAssignableFrom(type) ? trie.findClass(input[j++], Object.class) :
-                        type != Object.class && type.isInstance(Dungeon.level) ? Dungeon.level : // todo add handling if it is in fact passed
+                        type == Dungeon.level.getClass() ? Dungeon.level : // level autofill
                         // blindly instantiate, any error indicates invalid method.
                         Reflection.newInstanceUnhandled(trie.findClass(input[j++], type));
             }
             // todo determine the exact cases where this is reached.
-            if (args[i] == null) throw new IllegalArgumentException();
+            if (args[i] == null) throw new IllegalArgumentException("No argument for " + type.getName());
         }
         return args;
     }
