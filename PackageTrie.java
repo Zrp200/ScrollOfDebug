@@ -10,8 +10,6 @@ import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-import sun.net.www.protocol.file.FileURLConnection;
-
 public class PackageTrie {
     private final HashMap<String, PackageTrie> subTries = new HashMap<>();
     private final ArrayList<Class<?>> classes = new ArrayList<>();
@@ -141,7 +139,7 @@ public class PackageTrie {
 
                     if (connection instanceof JarURLConnection) {
                         checkJarFile((JarURLConnection) connection, pckgname, root);
-                    } else if (connection instanceof FileURLConnection) {
+                    } else if (url.getProtocol().equals("file")) {
                         try {
                             checkDirectory(
                                     new File(URLDecoder.decode(url.getPath(),
