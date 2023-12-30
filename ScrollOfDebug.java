@@ -921,6 +921,10 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
+        +"_2.0.0_:"
+            +"\n_-_ Added experimental macro support; macros are chains of commands stored together under an alias, saved between sessions"
+            +"\n_-_ Implemented workaround allowing scroll of debug to work even when it can't find any classes"
+            +"\n_-_ argument autofill now works with Object parameters, autofills level in more cases"
         +"_1.2.2_:"
             +"\n_-_ Goto no longer relies on version code in any form."
             +"\n_-_ Variables now attempt to show their ingame name rather than built-in toString."
