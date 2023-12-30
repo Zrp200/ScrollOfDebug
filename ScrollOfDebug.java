@@ -41,7 +41,9 @@ import com.shatteredpixel.shatteredpixeldungeon.utils.GLog;
 
 import com.watabou.noosa.Game;
 import com.watabou.noosa.ui.Component;
+import com.watabou.utils.Bundle;
 import com.watabou.utils.Callback;
+import com.watabou.utils.FileUtils;
 import com.watabou.utils.Reflection;
 
 import java.io.IOException;
@@ -56,7 +58,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v1.2.3
+ * @version v2.0.0-macro-test
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -107,6 +109,14 @@ public class ScrollOfDebug extends Scroll {
                 "If you set a variable from this command, the return value of the method will be stored into the variable."),
         INSPECT(Object.class, "<object>", "Gives a list of supported methods for the indicated class."),
         GOTO(null, "<depth>", "Sends your character to the indicated depth."),
+        MACRO(null, "<name>",
+                "Store a sequence of scroll of debug commands to a single name",
+                "Macros are a way to store and reproduce multiple scroll of debug commands at once.",
+                "This is an experimental feature. Anything that prompts the player should be at the last line of a macro.",
+                "Macros can call other macros",
+                "To take parameters, write '%n', where n is the nth input after the macro name when calling it. For example `mymacro rat` can reference 'rat' via '%1'.",
+                "Macros are saved and are kept independent of run."
+        ),
         VARIABLES(null,
                 "_@_<variable> [ [COMMAND ...] | i[nv] | c[ell] ]",
                 "store game objects for later use as method targets or parameters",
@@ -161,6 +171,46 @@ public class ScrollOfDebug extends Scroll {
         } catch (Exception e) { return null; } }
     }
 
+    // -- macro logic
+    private static final String MACRO_FILE = "debug-macros.dat", KEYS="KEYS", VALUES="VALUES";
+
+    private static HashMap<String, String> macros = null;
+
+    // always returns non-null value
+    private static Map<String, String> getMacros() {
+        if (macros == null) try {
+            Bundle macroBundle = FileUtils.bundleFromFile(MACRO_FILE);
+            String[] keys=macroBundle.getStringArray(KEYS), values=macroBundle.getStringArray(VALUES);
+            if (keys == null || values == null) throw new IOException("bad macro bundle!");
+            macros = new HashMap<>(keys.length);
+            for (int i=0; i < keys.length; i++) macros.put(keys[i], values[i]);
+        } catch (IOException e) {
+            // just... yea. Assuming the file just isn't there or something?
+            Game.reportException(new IOException("Failed to retrieve Scroll of Debug macros", e));
+            macros = new HashMap<>(); // initialize empty array
+        }
+        return macros;
+    }
+
+    /** creates or modifies macro with value. If value is empty, delete the macro. **/
+    public static void setMacro(String macro, String value) {
+        getMacros();
+        if(value.isEmpty() ? macros.remove(macro) == null : value.equals(macros.put(macro, value))) return;
+        // only run this if we actually changed macros
+        Bundle bundle = new Bundle();
+        String[] a = {};
+        bundle.put(KEYS, macros.keySet().toArray(a));
+        bundle.put(VALUES, macros.values().toArray(a));
+        try {
+            FileUtils.bundleToFile(MACRO_FILE, bundle);
+        } catch (IOException e) {
+            Game.reportException(new IOException("Failed to save Scroll of Debug macros", e));
+        }
+    }
+
+    // -- general logic
+
+    // fixme should be able to buffer a store location for a macro
     private String storeLocation;
 
     @Override
@@ -168,13 +218,51 @@ public class ScrollOfDebug extends Scroll {
         collect(); // you don't lose scroll of debug.
         GameScene.show(new WndTextInput("Enter Command:", null, "", 100, false,
                 "Execute", "Cancel") {
+
+            private String[] handleVariables(String[] input) {
+                storeLocation = null;
+                if (input.length > 0 && input[0].startsWith(Variable.MARKER)) {
+                    // drop from the start, save for later.
+                    storeLocation = input[0];
+                    if (storeLocation.length() == 1) {
+                        if (input.length > 1)
+                            GLog.w("warning: remaining arguments were discarded");
+                        // list them all
+                        StringBuilder s = new StringBuilder();
+                        for (Map.Entry<String, Variable> e : Variable.assigned.entrySet())
+                            if (e.getValue().isActive()) {
+                                s.append("\n_").append(e.getKey()).append("_ - ").append(e.getValue());
+                            }
+                        GameScene.show(new HelpWindow("Active Variables: \n" + s));
+                        return null;
+                    }
+                    input = Arrays.copyOfRange(input, 1, input.length);
+
+                    // variable-specific actions
+                    if (input.length == 0) {
+                        GLog.p("%s = %s", storeLocation, Variable.toString(storeLocation));
+                        return input;
+                    }
+                    String vCommand = input[0].toLowerCase();
+                    if (vCommand.matches("i(nv(entory)?)?")) {
+                        Variable.putFromInventory(storeLocation);
+                        return null;
+                    } else if (vCommand.matches("c(ell)?")) {
+                        Variable.putFromCell(storeLocation);
+                        return null;
+                    }
+
+                }
+                return input;
+            }
+
             @Override public void onSelect(boolean positive, String text) {
                 if(!positive) return;
 
                 // !! handling
                 {
                     Matcher m = Pattern.compile("!!").matcher(text);
-                    if(m.find()) {
+                    if (m.find()) {
                         GLog.newLine();
                         GLog.i("> %s", text = m.replaceAll(lastCommand));
                         GLog.newLine();
@@ -185,46 +273,83 @@ public class ScrollOfDebug extends Scroll {
                 String[] initialInput = text.split(" ");
                 Callback init = null;
 
-                final String[] input;
+                final String[] input = handleVariables(initialInput);
 
-                storeLocation = null;
-                if(initialInput.length > 0 && initialInput[0].startsWith(Variable.MARKER)) {
-                    // drop from the start, save for later.
-                    storeLocation = initialInput[0];
-                    if(storeLocation.length() == 1) {
-                        if(initialInput.length > 1) GLog.w("warning: remaining arguments were discarded");
-                        // list them all
-                        StringBuilder s = new StringBuilder();
-                        for(Map.Entry<String,Variable> e : Variable.assigned.entrySet()) if(e.getValue().isActive()) {
-                            s.append("\n_").append(e.getKey()).append("_ - ").append(e.getValue());
+                if (input == null || input.length == 0) return;
+
+                interpret(input);
+            }
+
+            // returns whether a macro exists
+            private boolean handleMacro(String[] input) {
+                String macro = getMacros().get(input[0]);
+                if(macro == null) return false; // only false output of handleMacro
+
+                Pattern argPattern = Pattern.compile("%(\\d)");
+                // avoid stupid infinite loops caused by parameter substitution
+                // I want to allow it but infinite loops are dumb
+                int[] placeholders = new int[input.length];
+                Arrays.fill(placeholders, -2); // -2 is unprocessed
+                for (int i = 0; i < input.length; i++) {
+                    if (placeholders[i] > -2) continue; // already processed
+                    int cur = i;
+                    StringBuilder loop = new StringBuilder();
+                    do {
+                        if (!loop.isEmpty()) loop.append("->");
+                        loop.append(cur);
+                        if (placeholders[cur] != -2) {
+                            GLog.n("infinite parameter loop: " + loop);
+                            return true;
                         }
-                        GameScene.show(new HelpWindow("Active Variables: \n" + s));
-                        return;
+                        Matcher matcher = argPattern.matcher(input[cur]);
+                        cur = placeholders[cur] = matcher.matches() ? Integer.parseInt(matcher.group(1)) : -1;
+                    } while(cur >= 0 && placeholders[cur] != -1);
+                }
+                String[] lines = macro.split("\n");
+                for (String line : lines) {
+                    try {
+                        while (true) {
+                            Matcher argMatcher = argPattern.matcher(line);
+                            if (argMatcher.find()) {
+                                int index = Integer.parseInt(argMatcher.group(1));
+                                argMatcher.reset();
+                                line = argMatcher.replaceFirst(input[index]);
+                                continue;
+                            }
+                            break;
+                        }
+                        String[] line_input = handleVariables(line.split(" "));
+                        if (line_input == null) break; // fixme should also indicate end of parsing
+                        // todo fix for when command isn't actually...given
+
+                        // interpret until we can't
+                        if (!interpret(line_input)) {
+                            return true;
+                        }
+                    } catch (Exception ex) {
+                        // todo better output
+                        GLog.n(n + ": " + ex.getMessage());
+                        Game.reportException(ex);
+                        break;
                     }
-                    input = Arrays.copyOfRange(initialInput, 1, initialInput.length);
+                }
+                return true;
+            }
 
-                    // variable-specific actions
-                    if(input.length == 0){
-                        GLog.p("%s = %s", storeLocation, Variable.toString(storeLocation));
-                        return;
+            // todo have redirect-able output for better logging
+            // command logic
+            // returns true if another command is safely called after it.
+            // errors generally return false to stop macro flow.
+            private boolean interpret(String... input) {
+                Command command = Command.get(input[0]);
+
+                if (command == null) {
+                    // fixme drawbacks of the current system make it impossible to verify macro call safety
+                    if (handleMacro(input)) {
+                        return true; // dig your own grave...
                     }
-                    String vCommand = input[0].toLowerCase();
-                    if(vCommand.matches("i(nv(entory)?)?")) {
-                        Variable.putFromInventory(storeLocation);
-                        return;
-                    } else if(vCommand.matches("c(ell)?")) {
-                        Variable.putFromCell(storeLocation);
-                        return;
-                    }
-
-                } else input = initialInput;
-
-                if(input.length == 0) return;
-
-                Command command; try { command = Command.valueOf(input[0].toUpperCase()); }
-                catch (Exception e) {
-                    GLog.w("\""+input[0]+"\" is not a valid command.");
-                    return;
+                    GLog.w("\"" + input[0] + "\" is not a valid command.");
+                    return false;
                 }
 
                 if(command == Command.CHANGES) {
@@ -256,7 +381,45 @@ public class ScrollOfDebug extends Scroll {
                         output = builder.toString().trim();
                     }
                     GameScene.show(new HelpWindow(output));
-                } else if(input.length > 1) {
+                    return false;
+                }
+                else if (command == Command.MACRO) {
+                    getMacros();
+                    if (input.length == 1) {
+                        StringBuilder msg = new StringBuilder();
+                        msg.append(command.documentation());
+                        if(!macros.isEmpty()) {
+                            msg.append("\n_Defined macros:_");
+                            for(String macro : macros.keySet()) {
+                                msg.append("\n_-_ ").append(macro);
+                            }
+                        }
+                        GameScene.show(new HelpWindow(msg.toString()));
+                        return false;
+                    }
+                    final String macro = input[1];
+                    boolean macroExists = macros.containsKey(macro);
+                    String failureReason =
+                            macroExists ? null : // avoid checks if it already exists
+                            Command.get(macro) != null ? "existing command" :
+                            // should I print out the offending part???
+                            !macro.matches("[A-Za-z_][\\w$_]*") ? "must be valid java variable name (alphanumeric, first character must be a letter or underscore)"
+                                    : null;
+                    if (failureReason != null) {
+                        GLog.n("Invalid macro name - " + failureReason);
+                    } else GameScene.show(new WndTextInput(
+                            "Macro " + input[1], "Enter macro.\n\nMacros consist of chains of scroll of debug commands separated by new lines. Please refrain from commands that prompt for input outside of the last line.",
+                            macroExists ? macros.get(macro) : "",
+                            Integer.MAX_VALUE, // ????
+                            true, "Confirm", "Cancel"
+                    ) {
+                        @Override public void onSelect(boolean positive, String text) {
+                            if (positive) setMacro(macro, text);
+                        }
+                    });
+                    return false;
+                }
+                else if(input.length > 1) {
                     Object storedVariable = Variable.get(input[1]);
 
                     if(command == Command.GOTO) {
@@ -267,14 +430,17 @@ public class ScrollOfDebug extends Scroll {
                             gotoDepth(Integer.parseInt(input[1]));
                         } catch (NumberFormatException e) {
                             GLog.w("Invalid depth provided: " + input[1]);
+                            // should I report this exception too?
+                            // false to stop at failure
+                            return false;
                         }
-                        return;
+                        return true;
                     }
 
                     Class _cls = storedVariable != null ? storedVariable.getClass()
                             : trie.findClass(input[1], command.paramClass);
 
-                    if(command == Command.INSPECT) {
+                    if(command == Command.INSPECT || command == Command.USE && input.length == 2) {
                         Class cls = _cls;
                         if(cls == null) {
                             Command c = Command.get(input[1]);
@@ -350,27 +516,24 @@ public class ScrollOfDebug extends Scroll {
                             GameScene.show(new HelpWindow(
                                     "inspection of _"+input[1]+"_:"
                                             + message.toString() ));
-                            return;
+                            return false;
                         }
                     }
 
                     final Class cls = _cls;
 
-                    if(command == Command.USE) {
-                        // alias for inspect when not enough args.
-                        if(input.length == 2) onSelect(true, "inspect " + input[1]);
-                        else {
-                            Object o =
-                                    storedVariable != null ? storedVariable : // use the variable if available.
-                                    cls == Hero.class ? Dungeon.hero :
-                                    cls != Object.class && cls != null && cls.isInstance(Dungeon.level) ? Dungeon.level :
-                                    cls != null && canInstantiate(cls) ? Reflection.newInstance(cls) :
-                                    null;
-                            if(!executeMethod(o, cls, input, 2)) {
-                                GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
-                            }
+                    if(command == Command.USE && input.length > 2) {
+                        Object o =
+                                storedVariable != null ? storedVariable : // use the variable if available.
+                                cls == Hero.class ? Dungeon.hero :
+                                cls != Object.class && cls != null && cls.isInstance(Dungeon.level) ? Dungeon.level :
+                                cls != null && canInstantiate(cls) ? Reflection.newInstance(cls) :
+                                null;
+                        if(!executeMethod(o, cls, input, 2)) {
+                            GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
+                            return false;
                         }
-                        return;
+                        return true;
                     }
 
                     boolean valid = true;
@@ -418,6 +581,7 @@ public class ScrollOfDebug extends Scroll {
                                         GLog.w("Spawned " + mob.name());
                                     }
                                 });
+                                return false; // DO NOT USE THIS IN MACROS DO NOT USE THIS IN MACROS
                             } else {
                                 int spawned = 0;
                                 boolean canExecute = true;
@@ -435,7 +599,7 @@ public class ScrollOfDebug extends Scroll {
                                         + (spawned == 1 ? "" : " x" + spawned)
                                 );
                             }
-                            break;
+                            return true;
                         case SET:
                             Trap t = (Trap)o;
                             GameScene.selectCell(new CellSelector.Listener() {
@@ -450,7 +614,7 @@ public class ScrollOfDebug extends Scroll {
                                     return "Select location of trap:";
                                 }
                             });
-                            break;
+                            return false; // game selectors do not stack well
                         case GIVE: Item item = (Item)o;
                             item.identify();
                             // todo add enchants/glyphs for weapons/armor?
@@ -474,8 +638,7 @@ public class ScrollOfDebug extends Scroll {
                                 else {
                                     if(!executeMethod(item,input,i)) {
                                         GLog.w("Unrecognized option or method '%s'", input[i]);
-                                        onSelect(true, "help " + input[0]);
-                                        return;
+                                        return interpret("help", input[0]);
                                     }
                                     break;
                                 }
@@ -498,7 +661,7 @@ public class ScrollOfDebug extends Scroll {
                             } else {
                                 GLog.n(Messages.get(curUser, "you_cant_have", itemName));
                             }
-                            break;
+                            return true;
                         case AFFECT:
                             Buff buff = (Buff)o;
                             // fixme perhaps have special logic for when additional arguments in general are passed to non-flavor buffs.
@@ -568,7 +731,7 @@ public class ScrollOfDebug extends Scroll {
                                     }
                                 }
                             });
-                            break;
+                            return false;
                         case SEED:
                             int a = 1;
                             if(input.length > 2) try {
@@ -584,8 +747,16 @@ public class ScrollOfDebug extends Scroll {
                                     GameScene.add(Blob.seed(cell, amount, (Class<Blob>)cls));
                                 }
                             });
-                    } else GLog.w( "%s \"%s\" not found.", command.paramClass.getSimpleName(), input[1]);
-                } else onSelect(true, "help " + text); // lazy me, I know.
+                            return false;
+                    } else {
+                        GLog.w( "%s \"%s\" not found.", command.paramClass.getSimpleName(), input[1]);
+                        return false;
+                    }
+                } else {
+                    // fixme should be able to just call help directly...
+                    return interpret("help", input[0]); // bring up help for command
+                }
+                return true;
             }
         });
     }
