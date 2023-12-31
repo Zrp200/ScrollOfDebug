@@ -6,7 +6,6 @@ import static java.util.Arrays.copyOfRange;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
 
-import com.badlogic.gdx.utils.IntMap;
 import com.badlogic.gdx.utils.StringBuilder;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 // Commands
@@ -282,13 +281,16 @@ public class ScrollOfDebug extends Scroll {
                             if(c != null) cls = c.paramClass;
                         }
                         if(cls != null) {
+                            boolean isGameClass = cls.getName().contains(ROOT); // dirty hack to allow seeing methods for out of package stuff
                             StringBuilder message = new StringBuilder();
                             for(Map.Entry<Class,Set<Method>> entry : hierarchy(cls).entrySet()) {
                                 Class inspecting = entry.getKey();
                                 String className = inspecting.getName();
-                                int i = className.indexOf(ROOT);
-                                if(i == -1) continue;
-                                className = className.substring(i+ROOT.length()+1);
+                                if (isGameClass) {
+                                    int i = className.indexOf(ROOT);
+                                    if(i == -1) continue;
+                                    className = className.substring(i+ROOT.length()+1);
+                                }
                                 message.append("\n\n_").append(className).append("_");
                                 Object[] enumConstants = inspecting.getEnumConstants();
                                 if(enumConstants != null) for(Object member : entry.getKey().getEnumConstants()) {
