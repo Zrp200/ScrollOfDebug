@@ -47,6 +47,8 @@ import com.watabou.utils.FileUtils;
 import com.watabou.utils.Reflection;
 
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -321,15 +323,15 @@ public class ScrollOfDebug extends Scroll {
                         String[] line_input = handleVariables(line.split(" "));
                         if (line_input == null) break; // fixme should also indicate end of parsing
                         // todo fix for when command isn't actually...given
+                        GLog.newLine();
+                        GLog.i("> " + line);
 
                         // interpret until we can't
                         if (!interpret(line_input)) {
                             return true;
                         }
                     } catch (Exception ex) {
-                        // todo better output
-                        GLog.n(n + ": " + ex.getMessage());
-                        Game.reportException(ex);
+                        reportException(ex);
                         break;
                     }
                 }
@@ -774,8 +776,7 @@ public class ScrollOfDebug extends Scroll {
     private static void gotoDepth(int targetDepth) {
             Mob.holdAllies( Dungeon.level );
             try { saveAll(); } catch (IOException e) {
-                Game.reportException(e);
-                GLog.w("Unable to save game, aborting.");
+                reportException("Unable to save game!", e);
                 return;
             }
             try {
@@ -832,15 +833,27 @@ public class ScrollOfDebug extends Scroll {
             if(method.getName().equalsIgnoreCase(methodName)) methods.add(method);
         }
         Collections.sort(methods, (m1, m2) -> m2.getParameterTypes().length - m1.getParameterTypes().length );
-        for(Method method : methods) try {
-            Object[] arguments = getArguments(method.getParameterTypes(), args);
-            Object result = method.invoke(obj, arguments);
-            if(result != null) {
-                printMethodOutput(cls,method,method.getModifiers(),result,arguments);
-                if(storeLocation != null) Variable.put(storeLocation, result);
+        for(Method method : methods) {
+            Object[] arguments; try { arguments = getArguments(method.getParameterTypes(), args); }
+            catch (Exception e) { continue; }
+            try {
+                Object result = method.invoke(obj, arguments);
+                if(result != null) {
+                    printMethodOutput(cls,method,method.getModifiers(),result,arguments);
+                    if(storeLocation != null) Variable.put(storeLocation, result);
+                }
+                return true;
+            } catch (Exception e) {
+                // fixme distinguish properly between methods that don't exist and methods that failed to call so errors can be reported here
+                // this is a straight up guess, and if it doesn't work as expected, remove the if-else clause entirely and just call Game.reportException
+                if (e instanceof IllegalArgumentException) {
+                    Game.reportException(e);
+                } else {
+                    reportException(e);
+                    break;
+                }
             }
-            return true;
-        } catch (Exception e) {/*do nothing */}
+        }
         // check if it is actually a field.
         try {
             Field field = null;
@@ -1097,6 +1110,20 @@ public class ScrollOfDebug extends Scroll {
             if(scrollPane != null) scrollPane.setSize(scrollPane.width(), scrollPane.height());
         }
     }
+
+    // report exception via HelpWindow
+    // should only be used if it terminates execution of whatever command was running
+    // wonder if I should split this into another file...
+    public static void reportException(CharSequence msg, Exception e) {
+        Game.reportException(e); // also log normally
+        // print stack trace directly to help window for faster error identification
+        StringWriter s = new StringWriter();
+        PrintWriter p = new PrintWriter(s);
+        if (msg != null) p.print(msg + "\n\n");
+        e.printStackTrace(p);
+        GameScene.show(new HelpWindow(s.toString()));
+    }
+    public static void reportException(Exception e) { reportException(null, e);}
 
     /** this checks if we can create this class using Reflection. **/
     public static boolean canInstantiate(Class c) {
