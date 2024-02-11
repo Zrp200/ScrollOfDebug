@@ -60,7 +60,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v2.0.0-macro-test
+ * @version v2.0.0
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -1137,7 +1137,7 @@ public class ScrollOfDebug extends Scroll {
         +"_2.0.0_:"
             +"\n_-_ Added experimental macro support; macros are chains of commands stored together under an alias, saved between sessions"
             +"\n_-_ Implemented workaround allowing scroll of debug to work even when it can't find any classes"
-            +"\n_-_ argument autofill now works with Object parameters, autofills level in more cases"
+            +"\n_-_ argument autofill now works with Object parameters, autofills level in more cases, and works with all primitives"
             +"\n_-_ some minor changes to method execution logic, will eventually print errors directly as stack trace in a scrollable window"
             +"\n_-_ fixed formatting in this command"
             +"\n"
