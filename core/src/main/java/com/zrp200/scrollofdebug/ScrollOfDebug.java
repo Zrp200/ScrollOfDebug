@@ -410,7 +410,9 @@ public class ScrollOfDebug extends Scroll {
                     if (failureReason != null) {
                         GLog.n("Invalid macro name - " + failureReason);
                     } else GameScene.show(new WndTextInput(
-                            "Macro " + input[1], "Enter macro.\n\nMacros consist of chains of scroll of debug commands separated by new lines. Please refrain from commands that prompt for input outside of the last line.",
+                            "Macro " + input[1],
+                            // pre-1.3 does not have this argument.
+                            /*"Enter macro.\n\nMacros consist of chains of scroll of debug commands separated by new lines. Please refrain from commands that prompt for input outside of the last line.",*/
                             macroExists ? macros.get(macro) : "",
                             Integer.MAX_VALUE, // ????
                             true, "Confirm", "Cancel"
