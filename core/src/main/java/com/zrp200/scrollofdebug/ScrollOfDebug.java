@@ -60,7 +60,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v2.0.0
+ * @version v2.0.1
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -939,8 +939,16 @@ public class ScrollOfDebug extends Scroll {
                 args[i] = Float.parseFloat(input[j++]);
             else if (type == String.class)
                 args[i] = input[j++];
-            else if (type == Boolean.class || type == boolean.class)
-                args[i] = Boolean.parseBoolean(input[j++]);
+            else if (type == Boolean.class || type == boolean.class) {
+                boolean result = Boolean.parseBoolean(input[j]);
+                // parseBoolean returns false if given invalid input
+                if (!result && !"false".equalsIgnoreCase(input[j])) {
+                    throw new NumberFormatException(input[j]);
+                }
+                args[i] = result;
+                j++;
+            }
+
             else if(input[j].equalsIgnoreCase("null")) {
                 // sometimes you want this.
                 args[i] = null;
