@@ -60,7 +60,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v2.0.1
+ * @version v2.1.0
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -786,11 +786,39 @@ public class ScrollOfDebug extends Scroll {
                 // if it fails for some unknown reason I really don't care, move on.
                 Game.reportException(e);
             }
+            // if ascending, don't bother loading levels in between
+            final int startDepth = depth;
+            Level level;
+            // attempt to load it directly
             depth = targetDepth;
-            Level level; try { level = loadLevel(GamesInProgress.curSlot); } catch (IOException e) {
-                // generating a new level before the feature rework incremented the level automatically.
-                if(before1_3_0) depth--;
-                level = newLevel();
+            try {
+                level = loadLevel(GamesInProgress.curSlot);
+            } catch (IOException needToGenerateLevel) {
+                // load each intermediate level to preserve seed generation logic if descending
+                depth = startDepth;
+                final Level origLevel = level = Dungeon.level;
+                final int increment = targetDepth < depth ? targetDepth - depth : 1;
+                while (depth != targetDepth) {
+                    depth += increment;
+                    try {
+                        level = loadLevel(GamesInProgress.curSlot);
+                    } catch (IOException e) {
+                        // generating a new level before the feature rework incremented the level automatically.
+                        if (before1_3_0) depth--;
+                        level = newLevel();
+                        if (depth != targetDepth) try {
+                            // need to overwrite Dungeon.level to save a level's generation
+                            Dungeon.level = level;
+                            Dungeon.saveLevel(GamesInProgress.curSlot);
+                        } catch (IOException ex) {
+                            // skip to dest level
+                            Game.reportException(e);
+                            depth = targetDepth - increment;
+                        } finally {
+                            Dungeon.level = origLevel;
+                        }
+                    }
+                }
             }
             switchLevel(level, -1);
             Game.switchScene(GameScene.class);
@@ -1142,6 +1170,8 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
+        +"_2.1_:"
+            +"\n_-_ Goto now loads intermediate depths. Load time is increased slightly, but is now seed-stable"
         +"_2.0.0_:"
             +"\n_-_ Added experimental macro support; macros are chains of commands stored together under an alias, saved between sessions"
             +"\n_-_ Implemented workaround allowing scroll of debug to work even when it can't find any classes"
