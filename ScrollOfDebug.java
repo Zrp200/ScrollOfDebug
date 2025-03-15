@@ -1196,9 +1196,8 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
-        +"_2.1.0_:"
+        +"_2.1_:"
             +"\n_-_ Goto now loads intermediate depths. Load time is increased slightly, but is now seed-stable"
-            +"\n_-_ Add warp command"
         +"_2.0.0_:"
             +"\n_-_ Added experimental macro support; macros are chains of commands stored together under an alias, saved between sessions"
             +"\n_-_ Implemented workaround allowing scroll of debug to work even when it can't find any classes"
