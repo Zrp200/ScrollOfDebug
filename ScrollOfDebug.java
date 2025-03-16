@@ -1,6 +1,8 @@
 package com.zrp200.scrollofdebug;
 
 import static com.shatteredpixel.shatteredpixeldungeon.Dungeon.*;
+// backwards compatible until v0.9.4, before, returned void (21de6d38)
+import static com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation.teleportToLocation;
 import static java.util.Arrays.copyOfRange;
 
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
@@ -111,6 +113,7 @@ public class ScrollOfDebug extends Scroll {
                 "If you set a variable from this command, the return value of the method will be stored into the variable."),
         INSPECT(Object.class, "<object>", "Gives a list of supported methods for the indicated class."),
         GOTO(null, "<depth>", "Sends your character to the indicated depth."),
+        WARP(null, "[<cell>]", "Targeted teleportation. Optionally takes a cell location, most easily assigned by variable"),
         MACRO(null, "<name>",
                 "Store a sequence of scroll of debug commands to a single name",
                 "Macros are a way to store and reproduce multiple scroll of debug commands at once.",
@@ -419,6 +422,29 @@ public class ScrollOfDebug extends Scroll {
                             if (positive) setMacro(macro, text);
                         }
                     });
+                    return false;
+                }
+                else if (command == Command.WARP) {
+                    Object storedVariable = input.length > 1 ? Variable.get(input[1]) : null;
+                    if (storedVariable instanceof Integer) {
+                        // backport note: prior to 1.0.0 there was no return value
+                        return teleportToLocation(hero, (int)storedVariable);
+                    }
+                    else if (input.length > 1) {
+                        GLog.w("Invalid argument provided: " + (storedVariable == null ? input[1] : storedVariable));
+                    } else {
+                        GameScene.selectCell(new CellSelector.Listener() {
+                            @Override
+                            public void onSelect(Integer cell) {
+                                if (cell != null) teleportToLocation(hero, cell);
+                            }
+
+                            @Override
+                            public String prompt() {
+                                return "Choose a location to teleport";
+                            }
+                        });
+                    }
                     return false;
                 }
                 else if(input.length > 1) {
@@ -1170,8 +1196,9 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
-        +"_2.1_:"
+        +"_2.1.0_:"
             +"\n_-_ Goto now loads intermediate depths. Load time is increased slightly, but is now seed-stable"
+            +"\n_-_ Add warp command"
         +"_2.0.0_:"
             +"\n_-_ Added experimental macro support; macros are chains of commands stored together under an alias, saved between sessions"
             +"\n_-_ Implemented workaround allowing scroll of debug to work even when it can't find any classes"
