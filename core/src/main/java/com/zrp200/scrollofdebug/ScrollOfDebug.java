@@ -1,6 +1,8 @@
 package com.zrp200.scrollofdebug;
 
 import static com.shatteredpixel.shatteredpixeldungeon.Dungeon.*;
+// backwards compatible until v0.9.4, before, returned void (21de6d38)
+import static com.shatteredpixel.shatteredpixeldungeon.items.scrolls.ScrollOfTeleportation.teleportToLocation;
 import static java.util.Arrays.copyOfRange;
 
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
@@ -60,7 +62,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v2.0.1
+ * @version v2.1.0
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -111,6 +113,7 @@ public class ScrollOfDebug extends Scroll {
                 "If you set a variable from this command, the return value of the method will be stored into the variable."),
         INSPECT(Object.class, "<object>", "Gives a list of supported methods for the indicated class."),
         GOTO(null, "<depth>", "Sends your character to the indicated depth."),
+        WARP(null, "[<cell>]", "Targeted teleportation. Optionally takes a cell location, most easily assigned by variable"),
         MACRO(null, "<name>",
                 "Store a sequence of scroll of debug commands to a single name",
                 "Macros are a way to store and reproduce multiple scroll of debug commands at once.",
@@ -421,6 +424,29 @@ public class ScrollOfDebug extends Scroll {
                             if (positive) setMacro(macro, text);
                         }
                     });
+                    return false;
+                }
+                else if (command == Command.WARP) {
+                    Object storedVariable = input.length > 1 ? Variable.get(input[1]) : null;
+                    if (storedVariable instanceof Integer) {
+                        // backport note: prior to 1.0.0 there was no return value
+                        return teleportToLocation(hero, (int)storedVariable);
+                    }
+                    else if (input.length > 1) {
+                        GLog.w("Invalid argument provided: " + (storedVariable == null ? input[1] : storedVariable));
+                    } else {
+                        GameScene.selectCell(new CellSelector.Listener() {
+                            @Override
+                            public void onSelect(Integer cell) {
+                                if (cell != null) teleportToLocation(hero, cell);
+                            }
+
+                            @Override
+                            public String prompt() {
+                                return "Choose a location to teleport";
+                            }
+                        });
+                    }
                     return false;
                 }
                 else if(input.length > 1) {
@@ -788,11 +814,39 @@ public class ScrollOfDebug extends Scroll {
                 // if it fails for some unknown reason I really don't care, move on.
                 Game.reportException(e);
             }
+            // if ascending, don't bother loading levels in between
+            final int startDepth = depth;
+            Level level;
+            // attempt to load it directly
             depth = targetDepth;
-            Level level; try { level = loadLevel(GamesInProgress.curSlot); } catch (IOException e) {
-                // generating a new level before the feature rework incremented the level automatically.
-                if(before1_3_0) depth--;
-                level = newLevel();
+            try {
+                level = loadLevel(GamesInProgress.curSlot);
+            } catch (IOException needToGenerateLevel) {
+                // load each intermediate level to preserve seed generation logic if descending
+                depth = startDepth;
+                final Level origLevel = level = Dungeon.level;
+                final int increment = targetDepth < depth ? targetDepth - depth : 1;
+                while (depth != targetDepth) {
+                    depth += increment;
+                    try {
+                        level = loadLevel(GamesInProgress.curSlot);
+                    } catch (IOException e) {
+                        // generating a new level before the feature rework incremented the level automatically.
+                        if (before1_3_0) depth--;
+                        level = newLevel();
+                        if (depth != targetDepth) try {
+                            // need to overwrite Dungeon.level to save a level's generation
+                            Dungeon.level = level;
+                            Dungeon.saveLevel(GamesInProgress.curSlot);
+                        } catch (IOException ex) {
+                            // skip to dest level
+                            Game.reportException(e);
+                            depth = targetDepth - increment;
+                        } finally {
+                            Dungeon.level = origLevel;
+                        }
+                    }
+                }
             }
             switchLevel(level, -1);
             Game.switchScene(GameScene.class);
@@ -1137,6 +1191,9 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
+        +"_2.1.0_:"
+            +"\n_-_ Goto now loads intermediate depths. Load time is increased slightly, but is now seed-stable"
+            +"\n_-_ Add warp command"
         +"_2.0.0_:"
             +"\n_-_ Added experimental macro support; macros are chains of commands stored together under an alias, saved between sessions"
             +"\n_-_ Implemented workaround allowing scroll of debug to work even when it can't find any classes"
