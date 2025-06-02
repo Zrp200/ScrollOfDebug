@@ -62,7 +62,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v2.1.0
+ * @version v2.1.1
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -551,11 +551,15 @@ public class ScrollOfDebug extends Scroll {
                     final Class cls = _cls;
 
                     if(command == Command.USE && input.length > 2) {
+                        if (cls == null) {
+                            GLog.w("Class \"%s\" not found", input[1]);
+                            return false;
+                        }
                         Object o =
                                 storedVariable != null ? storedVariable : // use the variable if available.
                                 cls == Hero.class ? Dungeon.hero :
-                                cls != Object.class && cls != null && cls.isInstance(Dungeon.level) ? Dungeon.level :
-                                cls != null && canInstantiate(cls) ? Reflection.newInstance(cls) :
+                                cls != Object.class && cls.isInstance(Dungeon.level) ? Dungeon.level :
+                                canInstantiate(cls) ? Reflection.newInstance(cls) :
                                 null;
                         if(!executeMethod(o, cls, input, 2)) {
                             GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
@@ -1196,6 +1200,8 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
+        +"_2.1.1:"
+            +"\n_-_ Fix use crashing when the class passed to it doesn't exist"
         +"_2.1.0_:"
             +"\n_-_ Goto now loads intermediate depths. Load time is increased slightly, but is now seed-stable"
             +"\n_-_ Add warp command"
