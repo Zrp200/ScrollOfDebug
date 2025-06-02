@@ -1187,7 +1187,7 @@ public class ScrollOfDebug extends Scroll {
         PrintWriter p = new PrintWriter(s);
         if (msg != null) p.print(msg + "\n\n");
         e.printStackTrace(p);
-        GameScene.show(new HelpWindow(s.toString()));
+        GameScene.show(new HelpWindow(s.toString().replace(ROOT + ".", "")));
     }
     public static void reportException(Exception e) { reportException(null, e);}
 
@@ -1200,11 +1200,14 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
-        +"_2.1.1:"
-            +"\n_-_ Fix use crashing when the class passed to it doesn't exist"
+        +"_2.1.1_:"
+            +"\n_-_ Fix _use_ crashing when the class passed to it doesn't exist"
+            +"\n_-_ Displayed crash output now filters out the root package to avoid overflowing"
+            +"\n"
         +"_2.1.0_:"
             +"\n_-_ Goto now loads intermediate depths. Load time is increased slightly, but is now seed-stable"
             +"\n_-_ Add warp command"
+            +"\n"
         +"_2.0.0_:"
             +"\n_-_ Added experimental macro support; macros are chains of commands stored together under an alias, saved between sessions"
             +"\n_-_ Implemented workaround allowing scroll of debug to work even when it can't find any classes"
