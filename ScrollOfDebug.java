@@ -8,7 +8,6 @@ import static java.util.Arrays.copyOfRange;
 import com.shatteredpixel.shatteredpixeldungeon.GamesInProgress;
 import com.shatteredpixel.shatteredpixeldungeon.items.scrolls.Scroll;
 
-import com.badlogic.gdx.utils.StringBuilder;
 import com.shatteredpixel.shatteredpixeldungeon.Dungeon;
 // Commands
 import com.shatteredpixel.shatteredpixeldungeon.actors.Actor;
@@ -300,7 +299,7 @@ public class ScrollOfDebug extends Scroll {
                     int cur = i;
                     StringBuilder loop = new StringBuilder();
                     do {
-                        if (!loop.isEmpty()) loop.append("->");
+                        if (loop.length() > 0) loop.append("->");
                         loop.append(cur);
                         if (placeholders[cur] != -2) {
                             GLog.n("infinite parameter loop: " + loop);
@@ -380,7 +379,7 @@ public class ScrollOfDebug extends Scroll {
                                 }
                             } else {
                                 // use documentation. (show syntax in addition to description)
-                                builder.append('\n').appendLine(cmd.documentation());
+                                builder.append('\n').append(cmd.documentation()).append('\n');
                             }
                         }
                         output = builder.toString().trim();
@@ -858,12 +857,14 @@ public class ScrollOfDebug extends Scroll {
         return "Scroll of Debug";
     }
     @Override public String desc() {
-        StringBuilder builder = new StringBuilder();
-        builder.appendLine("A scroll that gives you great power, letting you create virtually any item or mob in the game.")
-                .appendLine("\nSupported Commands:");
-        for(Command cmd : Command.values()) builder.appendLine(
+        StringBuilder builder = new StringBuilder(
+                "A scroll that gives you great power, letting you create virtually any item or mob in the game."
+                 + "\n\n"
+                + "Supported Commands:"
+        );
+        for(Command cmd : Command.values()) builder.append(
                 // this should hopefully fit on one line.
-                String.format("_- %s_: %s", cmd, cmd.summary)
+                String.format("_- %s_: %s\n", cmd, cmd.summary)
         );
         return builder.append("\nPlease note that some possible inputs may crash the game or cause other unexpected behavior, especially if their targets weren't intended to be created or otherwise used arbitrarily.")
                 .toString();
