@@ -44,6 +44,7 @@ import com.watabou.noosa.Game;
 import com.watabou.noosa.ui.Component;
 import com.watabou.utils.Bundle;
 import com.watabou.utils.Callback;
+import com.watabou.utils.DeviceCompat;
 import com.watabou.utils.FileUtils;
 import com.watabou.utils.Reflection;
 
@@ -1044,6 +1045,37 @@ public class ScrollOfDebug extends Scroll {
             if (args[i] == null) throw new IllegalArgumentException("No argument for " + type.getName());
         }
         return args;
+    }
+
+
+    /**
+     * force add scroll of debug if in an "indev" build, force remove otherwise
+     *
+     * this was in GameScene before. Adding this to GameScene is equivalent to the old behavior, and should result in far less conflicts
+     * **/
+    public static void handleDebug() {
+        // by default only added in "indev" builds.
+        handleDebug(DeviceCompat.isDebug());
+    }
+    /** force add scroll of debug if [supported], force remove otherwise **/
+    public static void handleDebug(boolean supported) {
+        ScrollOfDebug debug = Dungeon.hero.belongings.getItem(ScrollOfDebug.class);
+        if(supported) {
+            if(debug == null) {
+                debug = new ScrollOfDebug();
+                if(!debug.collect()) Dungeon.hero.belongings.backpack.items.add(debug);
+            }
+            if(!Dungeon.quickslot.contains(debug)) {
+                for(int slot = 0; slot < Dungeon.quickslot.SIZE; slot++) if(Dungeon.quickslot.getItem(slot) == null) {
+                    Dungeon.quickslot.setSlot(slot, debug);
+                    break;
+                }
+            }
+        } else if(debug != null) {
+            // attempt to remove scroll of debug automatically.
+            debug.detachAll(Dungeon.hero.belongings.backpack);
+            Dungeon.quickslot.clearItem(debug);
+        }
     }
 
     TreeMap<Class,Set<Method>> hierarchy(Class base) {
