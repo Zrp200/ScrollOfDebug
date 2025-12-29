@@ -1236,6 +1236,11 @@ public class ScrollOfDebug extends Scroll {
 
     private static final String CHANGELOG
         = ""
+        +"_2.2.0_:"
+            +"\n_-_ Removed LibGDX StringBuilder reliance"
+            +"\n_-_ moved GameScene logic to ScrollOfDebug to streamline adding it from subtrees"
+            +"\n_-_ Moved interpret and related methods to the top level of Scroll of Debug"
+            +"\n_-_ Fixed crash on Android builds"
         +"_2.1.1_:"
             +"\n_-_ Fix _use_ crashing when the class passed to it doesn't exist"
             +"\n_-_ Displayed crash output now filters out the root package to avoid overflowing"
