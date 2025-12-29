@@ -62,7 +62,7 @@ import java.util.regex.Pattern;
  *
  * @author  <a href="https://github.com/zrp200/scrollofdebug">
  *              Zrp200
- * @version v2.1.1
+ * @version v2.2.0
  *
  * @apiNote Compatible with Shattered Pixel Dungeon v1.3.0+, and compatible with any LibGDX Shattered Pixel Dungeon version (post v0.8) with minimal changes.
  * **/
@@ -223,574 +223,577 @@ public class ScrollOfDebug extends Scroll {
         collect(); // you don't lose scroll of debug.
         GameScene.show(new WndTextInput("Enter Command:", null, "", 100, false,
                 "Execute", "Cancel") {
+            @Override
+            public void onSelect(boolean positive, String text) {
+                if(positive) interpretText(text);
+            }
+        });
+    }
 
-            private String[] handleVariables(String[] input) {
-                storeLocation = null;
-                if (input.length > 0 && input[0].startsWith(Variable.MARKER)) {
-                    // drop from the start, save for later.
-                    storeLocation = input[0];
-                    if (storeLocation.length() == 1) {
-                        if (input.length > 1)
-                            GLog.w("warning: remaining arguments were discarded");
-                        // list them all
-                        StringBuilder s = new StringBuilder();
-                        for (Map.Entry<String, Variable> e : Variable.assigned.entrySet())
-                            if (e.getValue().isActive()) {
-                                s.append("\n_").append(e.getKey()).append("_ - ").append(e.getValue());
-                            }
-                        GameScene.show(new HelpWindow("Active Variables: \n" + s));
-                        return null;
+    private String[] handleVariables(String[] input) {
+        storeLocation = null;
+        if (input.length > 0 && input[0].startsWith(Variable.MARKER)) {
+            // drop from the start, save for later.
+            storeLocation = input[0];
+            if (storeLocation.length() == 1) {
+                if (input.length > 1)
+                    GLog.w("warning: remaining arguments were discarded");
+                // list them all
+                StringBuilder s = new StringBuilder();
+                for (Map.Entry<String, Variable> e : Variable.assigned.entrySet())
+                    if (e.getValue().isActive()) {
+                        s.append("\n_").append(e.getKey()).append("_ - ").append(e.getValue());
                     }
-                    input = Arrays.copyOfRange(input, 1, input.length);
+                GameScene.show(new HelpWindow("Active Variables: \n" + s));
+                return null;
+            }
+            input = Arrays.copyOfRange(input, 1, input.length);
 
-                    // variable-specific actions
-                    if (input.length == 0) {
-                        GLog.p("%s = %s", storeLocation, Variable.toString(storeLocation));
-                        return input;
-                    }
-                    String vCommand = input[0].toLowerCase();
-                    if (vCommand.matches("i(nv(entory)?)?")) {
-                        Variable.putFromInventory(storeLocation);
-                        return null;
-                    } else if (vCommand.matches("c(ell)?")) {
-                        Variable.putFromCell(storeLocation);
-                        return null;
-                    }
-
-                }
+            // variable-specific actions
+            if (input.length == 0) {
+                GLog.p("%s = %s", storeLocation, Variable.toString(storeLocation));
                 return input;
             }
-
-            @Override public void onSelect(boolean positive, String text) {
-                if(!positive) return;
-
-                // !! handling
-                {
-                    Matcher m = Pattern.compile("!!").matcher(text);
-                    if (m.find()) {
-                        GLog.newLine();
-                        GLog.i("> %s", text = m.replaceAll(lastCommand));
-                        GLog.newLine();
-                    }
-                }
-                lastCommand = text;
-
-                String[] initialInput = text.split(" ");
-                Callback init = null;
-
-                final String[] input = handleVariables(initialInput);
-
-                if (input == null || input.length == 0) return;
-
-                interpret(input);
+            String vCommand = input[0].toLowerCase();
+            if (vCommand.matches("i(nv(entory)?)?")) {
+                Variable.putFromInventory(storeLocation);
+                return null;
+            } else if (vCommand.matches("c(ell)?")) {
+                Variable.putFromCell(storeLocation);
+                return null;
             }
 
-            // returns whether a macro exists
-            private boolean handleMacro(String[] input) {
-                String macro = getMacros().get(input[0]);
-                if(macro == null) return false; // only false output of handleMacro
+        }
+        return input;
+    }
 
-                Pattern argPattern = Pattern.compile("%(\\d)");
-                // avoid stupid infinite loops caused by parameter substitution
-                // I want to allow it but infinite loops are dumb
-                int[] placeholders = new int[input.length];
-                Arrays.fill(placeholders, -2); // -2 is unprocessed
-                for (int i = 0; i < input.length; i++) {
-                    if (placeholders[i] > -2) continue; // already processed
-                    int cur = i;
-                    StringBuilder loop = new StringBuilder();
-                    do {
-                        if (loop.length() > 0) loop.append("->");
-                        loop.append(cur);
-                        if (placeholders[cur] != -2) {
-                            GLog.n("infinite parameter loop: " + loop);
-                            return true;
-                        }
-                        Matcher matcher = argPattern.matcher(input[cur]);
-                        cur = placeholders[cur] = matcher.matches() ? Integer.parseInt(matcher.group(1)) : -1;
-                    } while(cur >= 0 && placeholders[cur] != -1);
+    /** split text apart, handle !!, store last command **/
+    public void interpretText(String text) {
+        // !! handling
+        {
+            Matcher m = Pattern.compile("!!").matcher(text);
+            if (m.find()) {
+                GLog.newLine();
+                GLog.i("> %s", text = m.replaceAll(lastCommand));
+                GLog.newLine();
+            }
+        }
+        lastCommand = text;
+
+        String[] initialInput = text.split(" ");
+        Callback init = null;
+
+        final String[] input = handleVariables(initialInput);
+
+        if (input == null || input.length == 0) return;
+
+        interpret(input);
+    }
+
+    // returns whether a macro exists
+    public boolean handleMacro(String[] input) {
+        String macro = getMacros().get(input[0]);
+        if(macro == null) return false; // only false output of handleMacro
+
+        Pattern argPattern = Pattern.compile("%(\\d)");
+        // avoid stupid infinite loops caused by parameter substitution
+        // I want to allow it but infinite loops are dumb
+        int[] placeholders = new int[input.length];
+        Arrays.fill(placeholders, -2); // -2 is unprocessed
+        for (int i = 0; i < input.length; i++) {
+            if (placeholders[i] > -2) continue; // already processed
+            int cur = i;
+            StringBuilder loop = new StringBuilder();
+            do {
+                if (loop.length() > 0) loop.append("->");
+                loop.append(cur);
+                if (placeholders[cur] != -2) {
+                    GLog.n("infinite parameter loop: " + loop);
+                    return true;
                 }
-                String[] lines = macro.split("\n");
-                for (String line : lines) {
-                    try {
-                        while (true) {
-                            Matcher argMatcher = argPattern.matcher(line);
-                            if (argMatcher.find()) {
-                                int index = Integer.parseInt(argMatcher.group(1));
-                                argMatcher.reset();
-                                line = argMatcher.replaceFirst(input[index]);
-                                continue;
+                Matcher matcher = argPattern.matcher(input[cur]);
+                cur = placeholders[cur] = matcher.matches() ? Integer.parseInt(matcher.group(1)) : -1;
+            } while(cur >= 0 && placeholders[cur] != -1);
+        }
+        String[] lines = macro.split("\n");
+        for (String line : lines) {
+            try {
+                while (true) {
+                    Matcher argMatcher = argPattern.matcher(line);
+                    if (argMatcher.find()) {
+                        int index = Integer.parseInt(argMatcher.group(1));
+                        argMatcher.reset();
+                        line = argMatcher.replaceFirst(input[index]);
+                        continue;
+                    }
+                    break;
+                }
+                String[] line_input = handleVariables(line.split(" "));
+                if (line_input == null) break; // fixme should also indicate end of parsing
+                // todo fix for when command isn't actually...given
+                GLog.newLine();
+                GLog.i("> " + line);
+
+                // interpret until we can't
+                if (!interpret(line_input)) {
+                    return true;
+                }
+            } catch (Exception ex) {
+                reportException(ex);
+                break;
+            }
+        }
+        return true;
+    }
+
+    // todo have redirect-able output for better logging
+    // command logic
+    // returns true if another command is safely called after it.
+    // errors generally return false to stop macro flow.
+    public boolean interpret(String... input) {
+        Command command = Command.get(input[0]);
+
+        if (command == null) {
+            // fixme drawbacks of the current system make it impossible to verify macro call safety
+            if (handleMacro(input)) {
+                return true; // dig your own grave...
+            }
+            GLog.w("\"" + input[0] + "\" is not a valid command.");
+            return false;
+        }
+
+        if(command == Command.CHANGES) {
+            GameScene.show(new HelpWindow(CHANGELOG));
+        }
+        else if(command == Command.HELP) {
+            String output = null;
+            boolean all = false;
+            if (input.length > 1) {
+                // we only care about the initial argument.
+                Command cmd = Command.get(input[1]);
+                if (cmd != null) output = cmd.fullDocumentation(trie);
+                else all = input[1].equalsIgnoreCase("all");
+            }
+            if (output == null) {
+                StringBuilder builder = new StringBuilder();
+                for (Command cmd : Command.values()) {
+                    if (all) {
+                        // extensive. help is omitted because we are using help.
+                        if (cmd != Command.HELP) {
+                            builder.append("\n\n")
+                                    .append(cmd.fullDocumentation(trie, false));
+                        }
+                    } else {
+                        // use documentation. (show syntax in addition to description)
+                        builder.append('\n').append(cmd.documentation()).append('\n');
+                    }
+                }
+                output = builder.toString().trim();
+            }
+            GameScene.show(new HelpWindow(output));
+            return false;
+        }
+        else if (command == Command.MACRO) {
+            getMacros();
+            if (input.length == 1) {
+                StringBuilder msg = new StringBuilder();
+                msg.append(command.documentation());
+                if(!macros.isEmpty()) {
+                    msg.append("\n_Defined macros:_");
+                    for(String macro : macros.keySet()) {
+                        msg.append("\n_-_ ").append(macro);
+                    }
+                }
+                GameScene.show(new HelpWindow(msg.toString()));
+                return false;
+            }
+            final String macro = input[1];
+            boolean macroExists = macros.containsKey(macro);
+            String failureReason =
+                    macroExists ? null : // avoid checks if it already exists
+                            Command.get(macro) != null ? "existing command" :
+                                    // should I print out the offending part???
+                                    !macro.matches("[A-Za-z_][\\w$_]*") ? "must be valid java variable name (alphanumeric, first character must be a letter or underscore)"
+                                            : null;
+            if (failureReason != null) {
+                GLog.n("Invalid macro name - " + failureReason);
+            } else GameScene.show(new WndTextInput(
+                    "Macro " + input[1], "Enter macro.\n\nMacros consist of chains of scroll of debug commands separated by new lines. Please refrain from commands that prompt for input outside of the last line.",
+                    macroExists ? macros.get(macro) : "",
+                    Integer.MAX_VALUE, // ????
+                    true, "Confirm", "Cancel"
+            ) {
+                @Override public void onSelect(boolean positive, String text) {
+                    if (positive) setMacro(macro, text);
+                }
+            });
+            return false;
+        }
+        else if (command == Command.WARP) {
+            Object storedVariable = input.length > 1 ? Variable.get(input[1]) : null;
+            if (storedVariable instanceof Integer) {
+                // backport note: prior to 1.0.0 there was no return value
+                return teleportToLocation(hero, (int)storedVariable);
+            }
+            else if (input.length > 1) {
+                GLog.w("Invalid argument provided: " + (storedVariable == null ? input[1] : storedVariable));
+            } else {
+                GameScene.selectCell(new CellSelector.Listener() {
+                    @Override
+                    public void onSelect(Integer cell) {
+                        if (cell != null) teleportToLocation(hero, cell);
+                    }
+
+                    @Override
+                    public String prompt() {
+                        return "Choose a location to teleport";
+                    }
+                });
+            }
+            return false;
+        }
+        else if(input.length > 1) {
+            Object storedVariable = Variable.get(input[1]);
+
+            if(command == Command.GOTO) {
+                if(storedVariable instanceof Integer) {
+                    gotoDepth((Integer)storedVariable);
+                }
+                else try {
+                    gotoDepth(Integer.parseInt(input[1]));
+                } catch (NumberFormatException e) {
+                    GLog.w("Invalid depth provided: " + input[1]);
+                    // should I report this exception too?
+                    // false to stop at failure
+                    return false;
+                }
+                return true;
+            }
+
+            Class _cls = storedVariable != null ? storedVariable.getClass()
+                    : trie.findClass(input[1], command.paramClass);
+
+            if(command == Command.INSPECT || command == Command.USE && input.length == 2) {
+                Class cls = _cls;
+                if(cls == null) {
+                    Command c = Command.get(input[1]);
+                    if(c != null) cls = c.paramClass;
+                }
+                if(cls != null) {
+                    boolean isGameClass = cls.getName().contains(ROOT); // dirty hack to allow seeing methods for out of package stuff
+                    StringBuilder message = new StringBuilder();
+                    for(Map.Entry<Class,Set<Method>> entry : hierarchy(cls).entrySet()) {
+                        Class inspecting = entry.getKey();
+                        String className = inspecting.getName();
+                        if (isGameClass) {
+                            int i = className.indexOf(ROOT);
+                            if(i == -1) continue;
+                            className = className.substring(i+ROOT.length()+1);
+                        }
+                        message.append("\n\n_").append(className).append("_");
+                        Object[] enumConstants = inspecting.getEnumConstants();
+                        if(enumConstants != null) for(Object member : entry.getKey().getEnumConstants()) {
+                            message.append("\n_->_ ").append(member.toString().replaceAll("_"," "));
+                        }
+                        for(Field f : inspecting.getFields()) {
+                            if(f.isEnumConstant()) continue;
+                            if(f.getDeclaringClass() != inspecting) continue;
+                            int modifiers = f.getModifiers();
+                            Class t = f.getType();
+                            // wonder if this should be sorted (possibly static -> instance)
+                            // also need to revisit the use of symbols, - is duplicated inappropriately.
+                            message.append("\n_")
+                                    .append(Modifier.isStatic(modifiers) ? '-' : '#')
+                                    .append('_').append(f.getName().replaceAll("_"," "));
+                            if(Modifier.isFinal(modifiers)) {
+                                boolean showValue = Modifier.isStatic(modifiers);
+                                if(showValue) try {
+                                    // no point in showing if we're just going to get a meaningless hash
+                                    showValue = t.isPrimitive()
+                                            || t.getMethod("toString")
+                                            .getDeclaringClass() != Object.class;
+                                } catch (NoSuchMethodException e) { showValue = false; }
+                                if(showValue) try {
+                                    message.append("=").append(f.get(null));
+                                } catch (IllegalAccessException e) {/* do nothing*/}
+                                else {
+                                    message.append(": ").append(t.getSimpleName());
+                                }
+                            } else {
+                                // this signifies that the getter can be accessed this way. hopefully no one was dumb enough to duplicate the name.
+                                message.append(" [<")
+                                        .append(f.getType().getSimpleName())
+                                        .append(">]");
+                            }
+                        }
+                        for(Method m : entry.getValue()) {
+                            message.append("\n_").append(Modifier.isStatic(m.getModifiers()) ? '*' : '-').append("_")
+                                    .append(m.getName());
+                            Class[] types = m.getParameterTypes();
+                            int left = types.length;
+                            for(Class c : m.getParameterTypes()) {
+                                StringBuilder param = new StringBuilder("<");
+                                param.append(c.getSimpleName().toLowerCase());
+                                // varargs handling. Not supported, but...maybe someday?
+                                if(--left == 0 && m.isVarArgs()) param.append("..");
+                                param.append('>');
+                                // optional handling, currently only hero is handled.
+                                // todo have similar methods be merged, with the offending parameters marked as optional.
+                                if(c == Hero.class || c != Object.class && c.isInstance(Dungeon.level)) {
+                                    param.insert(0,'[').append(']');
+                                }
+                                message.append(' ').append(param);
+                            }
+                        }
+                    }
+                    GameScene.show(new HelpWindow(
+                            "inspection of _"+input[1]+"_:"
+                                    + message.toString() ));
+                    return false;
+                }
+            }
+
+            final Class cls = _cls;
+
+            if(command == Command.USE && input.length > 2) {
+                if (cls == null) {
+                    GLog.w("Class \"%s\" not found", input[1]);
+                    return false;
+                }
+                Object o =
+                        storedVariable != null ? storedVariable : // use the variable if available.
+                                cls == Hero.class ? Dungeon.hero :
+                                        cls != Object.class && cls.isInstance(Dungeon.level) ? Dungeon.level :
+                                                canInstantiate(cls) ? Reflection.newInstance(cls) :
+                                                        null;
+                if(!executeMethod(o, cls, input, 2)) {
+                    GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
+                    return false;
+                }
+                return true;
+            }
+
+            boolean valid = true;
+            Object o = null; try {
+                o = Reflection.newInstanceUnhandled(cls);
+                if(o != null) Variable.put(storeLocation, o);
+            } catch (Exception e) { valid = false; }
+            if (valid) switch (command) {
+                case SPAWN: Mob mob = (Mob)o;
+                    // process args
+                    int quantity = 1;
+                    boolean manualPlace = false;
+                    boolean qSpecified = false;
+                    if(input.length > 2) {
+                        String opt = input[2];
+                        // is this a forced use of regex?
+                        Matcher matcher = Pattern.compile("x(\\d+)").matcher(opt);
+                        if(matcher.find()) {
+                            quantity = Integer.parseInt(matcher.group(1));
+                            qSpecified = true;
+                        } else if(opt.matches("-p|--place")) {
+                            manualPlace = true;
+                        }
+                    }
+                    if(manualPlace) {
+                        GameScene.selectCell(new CellSelector.Listener() {
+                            @Override public String prompt() {
+                                return "Select a tile to place " + mob.name();
+                            }
+                            @Override public void onSelect(Integer cell) {
+                                if(cell == null) return;
+                                // damn it evan for making me copy paste this
+                                if(level.findMob(cell) != null
+                                        || !level.passable[cell]
+                                        || level.solid[cell]
+                                        || !level.openSpace[cell] && mob.properties().contains(Char.Property.LARGE)
+                                ) {
+                                    GLog.w("You cannot place %s here.", mob.name());
+                                    return;
+                                }
+                                mob.pos = cell;
+                                GameScene.add(mob);
+                                // doing this means that I can't actually let you select cells for methods; it'll be immediately cancelled.
+                                executeMethod(mob,input,3);
+                                GLog.w("Spawned " + mob.name());
+                            }
+                        });
+                        return false; // DO NOT USE THIS IN MACROS DO NOT USE THIS IN MACROS
+                    } else {
+                        int spawned = 0;
+                        boolean canExecute = true;
+                        // nonstandard for loop that generates mobs. first mob is the original one.
+                        for(Mob m = mob; m != null && spawned++ < quantity; m = (Mob)Reflection.newInstance(cls)) {
+                            m.pos = level.randomRespawnCell(m);
+                            if(m.pos == -1) break;
+                            GameScene.add(m);
+                            // if it fails we don't want to flood the screen with messages.
+                            if(canExecute) canExecute = executeMethod(m, input, qSpecified?3:2);
+                        }
+                        spawned--;
+                        GLog.w("Spawned "
+                                + mob.name()
+                                + (spawned == 1 ? "" : " x" + spawned)
+                        );
+                    }
+                    return true;
+                case SET:
+                    Trap t = (Trap)o;
+                    GameScene.selectCell(new CellSelector.Listener() {
+                        @Override
+                        public void onSelect(Integer cell) {
+                            if(cell ==  null || cell == -1) return;
+                            // currently manually set traps are always revealed.
+                            Dungeon.level.setTrap(t.set(cell).reveal(), cell);
+                            Level.set(cell, Terrain.TRAP);
+                        }
+                        @Override public String prompt() {
+                            return "Select location of trap:";
+                        }
+                    });
+                    return false; // game selectors do not stack well
+                case GIVE: Item item = (Item)o;
+                    item.identify();
+                    // todo add enchants/glyphs for weapons/armor?
+                    // process modifiers left to right (so later ones have higher precedence)
+                    boolean collect = false;
+                    for(int i=2; i < input.length; i++) {
+                        if(input[i].startsWith("--force") || input[i].equalsIgnoreCase("-f")) {
+                            collect = true;
+                        }
+                        else if(input[i].matches("[\\-x+]\\d+")) {
+                            switch (input[i].charAt(0)) {
+                                case 'x':
+                                    item.quantity(Integer.parseInt(input[i].substring(1)));
+                                    break;
+                                case '-':
+                                case '+':
+                                    item.level(Integer.parseInt(input[i]));
+                                    break;
+                            }
+                        }
+                        else {
+                            if(!executeMethod(item,input,i)) {
+                                GLog.w("Unrecognized option or method '%s'", input[i]);
+                                return interpret("help", input[0]);
                             }
                             break;
                         }
-                        String[] line_input = handleVariables(line.split(" "));
-                        if (line_input == null) break; // fixme should also indicate end of parsing
-                        // todo fix for when command isn't actually...given
-                        GLog.newLine();
-                        GLog.i("> " + line);
-
-                        // interpret until we can't
-                        if (!interpret(line_input)) {
-                            return true;
+                    }
+                    Item toPickUp = collect ? new Item() {
+                        // create wrapper item that simulates doPickUp while actually just calling collect.
+                        { image = item.image; }
+                        @Override public boolean collect(Bag container) {
+                            return item.collect(container);
                         }
-                    } catch (Exception ex) {
-                        reportException(ex);
-                        break;
+                    } : item;
+                    String itemName = item.name();
+                    if (toPickUp.doPickUp(curUser)) {
+                        // ripped from Hero#actPickUp, kinda.
+                        boolean important = item.unique && (item instanceof Scroll || item instanceof Potion);
+                        String pickupMessage = Messages.get(curUser, "you_now_have", itemName);
+                        if(important) GLog.p(pickupMessage); else GLog.i(pickupMessage);
+                        // attempt to nullify turn usage.
+                        curUser.spend(-curUser.cooldown());
+                    } else {
+                        GLog.n(Messages.get(curUser, "you_cant_have", itemName));
                     }
-                }
-                return true;
-            }
+                    return true;
+                case AFFECT:
+                    Buff buff = (Buff)o;
+                    // fixme perhaps have special logic for when additional arguments in general are passed to non-flavor buffs.
+                    GameScene.selectCell(new CellSelector.Listener() {
+                        @Override public String prompt() {
+                            return "Select the character to apply the buff to:";
+                        }
+                        @Override public void onSelect(Integer cell) {
+                            Char target;
+                            if(cell == null || cell == -1 || (target = Actor.findChar(cell)) == null) return;
+                            Buff added = null;
+                            int index = 2;
 
-            // todo have redirect-able output for better logging
-            // command logic
-            // returns true if another command is safely called after it.
-            // errors generally return false to stop macro flow.
-            private boolean interpret(String... input) {
-                Command command = Command.get(input[0]);
+                            boolean success = false;
 
-                if (command == null) {
-                    // fixme drawbacks of the current system make it impossible to verify macro call safety
-                    if (handleMacro(input)) {
-                        return true; // dig your own grave...
-                    }
-                    GLog.w("\"" + input[0] + "\" is not a valid command.");
-                    return false;
-                }
-
-                if(command == Command.CHANGES) {
-                    GameScene.show(new HelpWindow(CHANGELOG));
-                }
-                else if(command == Command.HELP) {
-                    String output = null;
-                    boolean all = false;
-                    if (input.length > 1) {
-                        // we only care about the initial argument.
-                        Command cmd = Command.get(input[1]);
-                        if (cmd != null) output = cmd.fullDocumentation(trie);
-                        else all = input[1].equalsIgnoreCase("all");
-                    }
-                    if (output == null) {
-                        StringBuilder builder = new StringBuilder();
-                        for (Command cmd : Command.values()) {
-                            if (all) {
-                                // extensive. help is omitted because we are using help.
-                                if (cmd != Command.HELP) {
-                                    builder.append("\n\n")
-                                            .append(cmd.fullDocumentation(trie, false));
+                            if(index >= input.length)
+                            {
+                                // no additional arguments.
+                                Buff.affect(target, cls);
+                            }
+                            else {
+                                if(buff instanceof FlavourBuff) {
+                                    try {
+                                        added = Buff.affect(target,cls,Float.parseFloat(input[index]));
+                                        index++;
+                                    } catch (NumberFormatException e) {
+                                        added = Buff.affect(target,cls);
+                                    }
+                                } else {
+                                    added = Buff.affect(target, cls);
+                                    // check some common methods for active buffs
+                                    String[] methodNames = {"set", "reset", "prolong", "extend"};
+                                    for(String methodName : methodNames) {
+                                        if(success = executeMethod(added, methodName, copyOfRange(input,index,input.length)))
+                                            break;
+                                    }
                                 }
-                            } else {
-                                // use documentation. (show syntax in addition to description)
-                                builder.append('\n').append(cmd.documentation()).append('\n');
+                                // attempt to call a specified method.
+                                if(!success &&
+                                        index < input.length
+                                        && !executeMethod(added, input, index)
+                                ) GLog.w("Warning: No supported method matching "+input[index]+" was found.");
                             }
-                        }
-                        output = builder.toString().trim();
-                    }
-                    GameScene.show(new HelpWindow(output));
-                    return false;
-                }
-                else if (command == Command.MACRO) {
-                    getMacros();
-                    if (input.length == 1) {
-                        StringBuilder msg = new StringBuilder();
-                        msg.append(command.documentation());
-                        if(!macros.isEmpty()) {
-                            msg.append("\n_Defined macros:_");
-                            for(String macro : macros.keySet()) {
-                                msg.append("\n_-_ ").append(macro);
+                            if(added == null) {
+                                added = Buff.affect(target, cls);
                             }
-                        }
-                        GameScene.show(new HelpWindow(msg.toString()));
-                        return false;
-                    }
-                    final String macro = input[1];
-                    boolean macroExists = macros.containsKey(macro);
-                    String failureReason =
-                            macroExists ? null : // avoid checks if it already exists
-                            Command.get(macro) != null ? "existing command" :
-                            // should I print out the offending part???
-                            !macro.matches("[A-Za-z_][\\w$_]*") ? "must be valid java variable name (alphanumeric, first character must be a letter or underscore)"
-                                    : null;
-                    if (failureReason != null) {
-                        GLog.n("Invalid macro name - " + failureReason);
-                    } else GameScene.show(new WndTextInput(
-                            "Macro " + input[1], "Enter macro.\n\nMacros consist of chains of scroll of debug commands separated by new lines. Please refrain from commands that prompt for input outside of the last line.",
-                            macroExists ? macros.get(macro) : "",
-                            Integer.MAX_VALUE, // ????
-                            true, "Confirm", "Cancel"
-                    ) {
-                        @Override public void onSelect(boolean positive, String text) {
-                            if (positive) setMacro(macro, text);
+                            // manual announce.
+                            if(added.icon() == BuffIndicator.NONE && !added.announced) {
+                                int color; switch(added.type) {
+                                    case POSITIVE:
+                                        color = CharSprite.POSITIVE;
+                                        break;
+                                    case NEGATIVE:
+                                        color = CharSprite.NEGATIVE;
+                                        break;
+                                    default:
+                                        color = CharSprite.NEUTRAL;
+                                }
+                                String buffName; try {
+                                    // Evan attempted to screw me over by changing toString implementations of buff to a new name() method (see be01254)
+                                    // Unfortunately for him, I can just check for it.
+                                    buffName = (String)added.getClass()
+                                            .getMethod("name")
+                                            .invoke(added);
+                                } catch(Exception e) { buffName = added.toString(); }
+                                target.sprite.showStatus(color, buffName);
+                            }
                         }
                     });
                     return false;
-                }
-                else if (command == Command.WARP) {
-                    Object storedVariable = input.length > 1 ? Variable.get(input[1]) : null;
-                    if (storedVariable instanceof Integer) {
-                        // backport note: prior to 1.0.0 there was no return value
-                        return teleportToLocation(hero, (int)storedVariable);
-                    }
-                    else if (input.length > 1) {
-                        GLog.w("Invalid argument provided: " + (storedVariable == null ? input[1] : storedVariable));
-                    } else {
-                        GameScene.selectCell(new CellSelector.Listener() {
-                            @Override
-                            public void onSelect(Integer cell) {
-                                if (cell != null) teleportToLocation(hero, cell);
-                            }
-
-                            @Override
-                            public String prompt() {
-                                return "Choose a location to teleport";
-                            }
-                        });
-                    }
+                case SEED:
+                    int a = 1;
+                    if(input.length > 2) try {
+                        a = Integer.parseInt(input[2]);
+                    } catch (Exception e) {/*do nothing*/}
+                    final int amount = a;
+                    GameScene.selectCell(new CellSelector.Listener() {
+                        @Override public String prompt() {
+                            return "Select the tile to seed the blob:";
+                        }
+                        @Override public void onSelect(Integer cell) {
+                            if(cell == null) return;
+                            GameScene.add(Blob.seed(cell, amount, (Class<Blob>)cls));
+                        }
+                    });
                     return false;
-                }
-                else if(input.length > 1) {
-                    Object storedVariable = Variable.get(input[1]);
-
-                    if(command == Command.GOTO) {
-                        if(storedVariable instanceof Integer) {
-                            gotoDepth((Integer)storedVariable);
-                        }
-                        else try {
-                            gotoDepth(Integer.parseInt(input[1]));
-                        } catch (NumberFormatException e) {
-                            GLog.w("Invalid depth provided: " + input[1]);
-                            // should I report this exception too?
-                            // false to stop at failure
-                            return false;
-                        }
-                        return true;
-                    }
-
-                    Class _cls = storedVariable != null ? storedVariable.getClass()
-                            : trie.findClass(input[1], command.paramClass);
-
-                    if(command == Command.INSPECT || command == Command.USE && input.length == 2) {
-                        Class cls = _cls;
-                        if(cls == null) {
-                            Command c = Command.get(input[1]);
-                            if(c != null) cls = c.paramClass;
-                        }
-                        if(cls != null) {
-                            boolean isGameClass = cls.getName().contains(ROOT); // dirty hack to allow seeing methods for out of package stuff
-                            StringBuilder message = new StringBuilder();
-                            for(Map.Entry<Class,Set<Method>> entry : hierarchy(cls).entrySet()) {
-                                Class inspecting = entry.getKey();
-                                String className = inspecting.getName();
-                                if (isGameClass) {
-                                    int i = className.indexOf(ROOT);
-                                    if(i == -1) continue;
-                                    className = className.substring(i+ROOT.length()+1);
-                                }
-                                message.append("\n\n_").append(className).append("_");
-                                Object[] enumConstants = inspecting.getEnumConstants();
-                                if(enumConstants != null) for(Object member : entry.getKey().getEnumConstants()) {
-                                    message.append("\n_->_ ").append(member.toString().replaceAll("_"," "));
-                                }
-                                for(Field f : inspecting.getFields()) {
-                                    if(f.isEnumConstant()) continue;
-                                    if(f.getDeclaringClass() != inspecting) continue;
-                                    int modifiers = f.getModifiers();
-                                    Class t = f.getType();
-                                    // wonder if this should be sorted (possibly static -> instance)
-                                    // also need to revisit the use of symbols, - is duplicated inappropriately.
-                                    message.append("\n_")
-                                            .append(Modifier.isStatic(modifiers) ? '-' : '#')
-                                            .append('_').append(f.getName().replaceAll("_"," "));
-                                    if(Modifier.isFinal(modifiers)) {
-                                        boolean showValue = Modifier.isStatic(modifiers);
-                                        if(showValue) try {
-                                            // no point in showing if we're just going to get a meaningless hash
-                                            showValue = t.isPrimitive()
-                                                    || t.getMethod("toString")
-                                                        .getDeclaringClass() != Object.class;
-                                        } catch (NoSuchMethodException e) { showValue = false; }
-                                        if(showValue) try {
-                                            message.append("=").append(f.get(null));
-                                        } catch (IllegalAccessException e) {/* do nothing*/}
-                                        else {
-                                            message.append(": ").append(t.getSimpleName());
-                                        }
-                                    } else {
-                                        // this signifies that the getter can be accessed this way. hopefully no one was dumb enough to duplicate the name.
-                                        message.append(" [<")
-                                                .append(f.getType().getSimpleName())
-                                                .append(">]");
-                                    }
-                                }
-                                for(Method m : entry.getValue()) {
-                                    message.append("\n_").append(Modifier.isStatic(m.getModifiers()) ? '*' : '-').append("_")
-                                            .append(m.getName());
-                                    Class[] types = m.getParameterTypes();
-                                    int left = types.length;
-                                    for(Class c : m.getParameterTypes()) {
-                                        StringBuilder param = new StringBuilder("<");
-                                        param.append(c.getSimpleName().toLowerCase());
-                                        // varargs handling. Not supported, but...maybe someday?
-                                        if(--left == 0 && m.isVarArgs()) param.append("..");
-                                        param.append('>');
-                                        // optional handling, currently only hero is handled.
-                                        // todo have similar methods be merged, with the offending parameters marked as optional.
-                                        if(c == Hero.class || c != Object.class && c.isInstance(Dungeon.level)) {
-                                            param.insert(0,'[').append(']');
-                                        }
-                                        message.append(' ').append(param);
-                                    }
-                                }
-                            }
-                            GameScene.show(new HelpWindow(
-                                    "inspection of _"+input[1]+"_:"
-                                            + message.toString() ));
-                            return false;
-                        }
-                    }
-
-                    final Class cls = _cls;
-
-                    if(command == Command.USE && input.length > 2) {
-                        if (cls == null) {
-                            GLog.w("Class \"%s\" not found", input[1]);
-                            return false;
-                        }
-                        Object o =
-                                storedVariable != null ? storedVariable : // use the variable if available.
-                                cls == Hero.class ? Dungeon.hero :
-                                cls != Object.class && cls.isInstance(Dungeon.level) ? Dungeon.level :
-                                canInstantiate(cls) ? Reflection.newInstance(cls) :
-                                null;
-                        if(!executeMethod(o, cls, input, 2)) {
-                            GLog.w(String.format("No method '%s' was found for %s", input[2], cls));
-                            return false;
-                        }
-                        return true;
-                    }
-
-                    boolean valid = true;
-                    Object o = null; try {
-                        o = Reflection.newInstanceUnhandled(cls);
-                        if(o != null) Variable.put(storeLocation, o);
-                    } catch (Exception e) { valid = false; }
-                    if (valid) switch (command) {
-                        case SPAWN: Mob mob = (Mob)o;
-                            // process args
-                            int quantity = 1;
-                            boolean manualPlace = false;
-                            boolean qSpecified = false;
-                            if(input.length > 2) {
-                                String opt = input[2];
-                                // is this a forced use of regex?
-                                Matcher matcher = Pattern.compile("x(\\d+)").matcher(opt);
-                                if(matcher.find()) {
-                                    quantity = Integer.parseInt(matcher.group(1));
-                                    qSpecified = true;
-                                } else if(opt.matches("-p|--place")) {
-                                    manualPlace = true;
-                                }
-                            }
-                            if(manualPlace) {
-                                GameScene.selectCell(new CellSelector.Listener() {
-                                    @Override public String prompt() {
-                                        return "Select a tile to place " + mob.name();
-                                    }
-                                    @Override public void onSelect(Integer cell) {
-                                        if(cell == null) return;
-                                        // damn it evan for making me copy paste this
-                                        if(level.findMob(cell) != null
-                                                || !level.passable[cell]
-                                                || level.solid[cell]
-                                                || !level.openSpace[cell] && mob.properties().contains(Char.Property.LARGE)
-                                        ) {
-                                            GLog.w("You cannot place %s here.", mob.name());
-                                            return;
-                                        }
-                                        mob.pos = cell;
-                                        GameScene.add(mob);
-                                        // doing this means that I can't actually let you select cells for methods; it'll be immediately cancelled.
-                                        executeMethod(mob,input,3);
-                                        GLog.w("Spawned " + mob.name());
-                                    }
-                                });
-                                return false; // DO NOT USE THIS IN MACROS DO NOT USE THIS IN MACROS
-                            } else {
-                                int spawned = 0;
-                                boolean canExecute = true;
-                                // nonstandard for loop that generates mobs. first mob is the original one.
-                                for(Mob m = mob; m != null && spawned++ < quantity; m = (Mob)Reflection.newInstance(cls)) {
-                                    m.pos = level.randomRespawnCell(m);
-                                    if(m.pos == -1) break;
-                                    GameScene.add(m);
-                                    // if it fails we don't want to flood the screen with messages.
-                                    if(canExecute) canExecute = executeMethod(m, input, qSpecified?3:2);
-                                }
-                                spawned--;
-                                GLog.w("Spawned "
-                                        + mob.name()
-                                        + (spawned == 1 ? "" : " x" + spawned)
-                                );
-                            }
-                            return true;
-                        case SET:
-                            Trap t = (Trap)o;
-                            GameScene.selectCell(new CellSelector.Listener() {
-                                @Override
-                                public void onSelect(Integer cell) {
-                                    if(cell ==  null || cell == -1) return;
-                                    // currently manually set traps are always revealed.
-                                    Dungeon.level.setTrap(t.set(cell).reveal(), cell);
-                                    Level.set(cell, Terrain.TRAP);
-                                }
-                                @Override public String prompt() {
-                                    return "Select location of trap:";
-                                }
-                            });
-                            return false; // game selectors do not stack well
-                        case GIVE: Item item = (Item)o;
-                            item.identify();
-                            // todo add enchants/glyphs for weapons/armor?
-                            // process modifiers left to right (so later ones have higher precedence)
-                            boolean collect = false;
-                            for(int i=2; i < input.length; i++) {
-                                if(input[i].startsWith("--force") || input[i].equalsIgnoreCase("-f")) {
-                                    collect = true;
-                                }
-                                else if(input[i].matches("[\\-x+]\\d+")) {
-                                    switch (input[i].charAt(0)) {
-                                        case 'x':
-                                            item.quantity(Integer.parseInt(input[i].substring(1)));
-                                            break;
-                                        case '-':
-                                        case '+':
-                                            item.level(Integer.parseInt(input[i]));
-                                            break;
-                                    }
-                                }
-                                else {
-                                    if(!executeMethod(item,input,i)) {
-                                        GLog.w("Unrecognized option or method '%s'", input[i]);
-                                        return interpret("help", input[0]);
-                                    }
-                                    break;
-                                }
-                            }
-                            Item toPickUp = collect ? new Item() {
-                                // create wrapper item that simulates doPickUp while actually just calling collect.
-                                { image = item.image; }
-                                @Override public boolean collect(Bag container) {
-                                    return item.collect(container);
-                                }
-                            } : item;
-                            String itemName = item.name();
-                            if (toPickUp.doPickUp(curUser)) {
-                                // ripped from Hero#actPickUp, kinda.
-                                boolean important = item.unique && (item instanceof Scroll || item instanceof Potion);
-                                String pickupMessage = Messages.get(curUser, "you_now_have", itemName);
-                                if(important) GLog.p(pickupMessage); else GLog.i(pickupMessage);
-                                // attempt to nullify turn usage.
-                                curUser.spend(-curUser.cooldown());
-                            } else {
-                                GLog.n(Messages.get(curUser, "you_cant_have", itemName));
-                            }
-                            return true;
-                        case AFFECT:
-                            Buff buff = (Buff)o;
-                            // fixme perhaps have special logic for when additional arguments in general are passed to non-flavor buffs.
-                            GameScene.selectCell(new CellSelector.Listener() {
-                                @Override public String prompt() {
-                                    return "Select the character to apply the buff to:";
-                                }
-                                @Override public void onSelect(Integer cell) {
-                                    Char target;
-                                    if(cell == null || cell == -1 || (target = Actor.findChar(cell)) == null) return;
-                                    Buff added = null;
-                                    int index = 2;
-
-                                    boolean success = false;
-
-                                    if(index >= input.length)
-                                    {
-                                        // no additional arguments.
-                                        Buff.affect(target, cls);
-                                    }
-                                    else {
-                                        if(buff instanceof FlavourBuff) {
-                                            try {
-                                                added = Buff.affect(target,cls,Float.parseFloat(input[index]));
-                                                index++;
-                                            } catch (NumberFormatException e) {
-                                                added = Buff.affect(target,cls);
-                                            }
-                                        } else {
-                                            added = Buff.affect(target, cls);
-                                            // check some common methods for active buffs
-                                            String[] methodNames = {"set", "reset", "prolong", "extend"};
-                                            for(String methodName : methodNames) {
-                                                if(success = executeMethod(added, methodName, copyOfRange(input,index,input.length)))
-                                                    break;
-                                            }
-                                        }
-                                        // attempt to call a specified method.
-                                        if(!success &&
-                                                index < input.length
-                                                && !executeMethod(added, input, index)
-                                        ) GLog.w("Warning: No supported method matching "+input[index]+" was found.");
-                                    }
-                                    if(added == null) {
-                                        added = Buff.affect(target, cls);
-                                    }
-                                    // manual announce.
-                                    if(added.icon() == BuffIndicator.NONE && !added.announced) {
-                                        int color; switch(added.type) {
-                                            case POSITIVE:
-                                                color = CharSprite.POSITIVE;
-                                                break;
-                                            case NEGATIVE:
-                                                color = CharSprite.NEGATIVE;
-                                                break;
-                                            default:
-                                                color = CharSprite.NEUTRAL;
-                                        }
-                                        String buffName; try {
-                                            // Evan attempted to screw me over by changing toString implementations of buff to a new name() method (see be01254)
-                                            // Unfortunately for him, I can just check for it.
-                                            buffName = (String)added.getClass()
-                                                    .getMethod("name")
-                                                    .invoke(added);
-                                        } catch(Exception e) { buffName = added.toString(); }
-                                        target.sprite.showStatus(color, buffName);
-                                    }
-                                }
-                            });
-                            return false;
-                        case SEED:
-                            int a = 1;
-                            if(input.length > 2) try {
-                                a = Integer.parseInt(input[2]);
-                            } catch (Exception e) {/*do nothing*/}
-                            final int amount = a;
-                            GameScene.selectCell(new CellSelector.Listener() {
-                                @Override public String prompt() {
-                                    return "Select the tile to seed the blob:";
-                                }
-                                @Override public void onSelect(Integer cell) {
-                                    if(cell == null) return;
-                                    GameScene.add(Blob.seed(cell, amount, (Class<Blob>)cls));
-                                }
-                            });
-                            return false;
-                    } else {
-                        GLog.w( "%s \"%s\" not found.", command.paramClass.getSimpleName(), input[1]);
-                        return false;
-                    }
-                } else {
-                    // fixme should be able to just call help directly...
-                    return interpret("help", input[0]); // bring up help for command
-                }
-                return true;
+            } else {
+                GLog.w( "%s \"%s\" not found.", command.paramClass.getSimpleName(), input[1]);
+                return false;
             }
-        });
+        } else {
+            // fixme should be able to just call help directly...
+            return interpret("help", input[0]); // bring up help for command
+        }
+        return true;
     }
 
     /** level transition was implemented in 1.3.0 **/
